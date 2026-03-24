@@ -1,0 +1,965 @@
+import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, type SimulatorStatus, type ReplacementRequest } from '../store/booking'
+import { getAllUsers, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
+import { useEffect, useMemo, useState, useRef } from 'react'
+
+type Props = {
+  mode?: 'admin' | 'staff'
+}
+
+export default function AdminDashboard({ mode = 'admin' }: Props) {
+  const [tab, setTab] = useState<'ops' | 'overview' | 'bookings' | 'users' | 'calendar' | 'courses' | 'announcements'>(() => (mode === 'staff' ? 'ops' : 'overview'))
+  const [tick, setTick] = useState(0)
+  
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [blockedMap, setBlockedMap] = useState<Record<string, number[]>>({})
+  const [loading, setLoading] = useState(true)
+
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [simStatus, setSimStatus] = useState<SimulatorStatus | null>(null)
+  const [simDraftReady, setSimDraftReady] = useState(true)
+  const [simDraftNote, setSimDraftNote] = useState('')
+  const [simSaving, setSimSaving] = useState(false)
+
+  const [requests, setRequests] = useState<ReplacementRequest[]>([])
+  const [reqDate, setReqDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [reqSlot, setReqSlot] = useState(0)
+  const [reqReplacementName, setReqReplacementName] = useState('')
+  const [reqReplacementPhone, setReqReplacementPhone] = useState('')
+  const [reqNote, setReqNote] = useState('')
+  const [reqSubmitting, setReqSubmitting] = useState(false)
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true)
+      const bP = getBookings()
+      const blP = getBlockedSlots()
+      const simP = getSimulatorStatus()
+      const reqP = getReplacementRequests()
+      const isAdminMode = mode === 'admin'
+      const adminP: Promise<[User[], Course[], Announcement[]]> = isAdminMode
+        ? Promise.all([getAllUsers(), getCourses(), getAnnouncements()])
+        : Promise.resolve([[] as User[], [] as Course[], [] as Announcement[]])
+
+      const [b, bl, sim, req, [u, c, a]] = await Promise.all([bP, blP, simP, reqP, adminP])
+      setBookings(b.sort((a, b) => b.date.localeCompare(a.date)))
+      setBlockedMap(bl)
+      setSimStatus(sim)
+      setRequests(req)
+
+      if (isAdminMode) {
+        setUsers(u)
+        setCourses(c)
+        setAnnouncements(a)
+      } else {
+        setUsers([])
+        setCourses([])
+        setAnnouncements([])
+      }
+
+      setSimDraftReady(sim?.ready ?? true)
+      setSimDraftNote(sim?.note ? String(sim.note) : '')
+      setLoading(false)
+    }
+    loadData()
+  }, [tick, mode])
+
+  const courseMap = useMemo(() => courses.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {} as any), [courses])
+  
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUserFlightLog, setSelectedUserFlightLog] = useState<any[]>([])
+
+  useEffect(() => {
+    if (selectedUser) {
+      getFlightLog(selectedUser.email).then(setSelectedUserFlightLog)
+    }
+  }, [selectedUser, tick])
+
+  const roles: UserRole[] = ['Admin', 'Technician', 'Pilot', 'User']
+
+  async function handleRoleChange(userId: string, role: UserRole) {
+    if (!confirm(`ยืนยันการเปลี่ยน Role เป็น ${role}?`)) return
+    const ok = await updateUserRole(userId, role)
+    if (ok) {
+      setTick(t => t + 1)
+      if (selectedUser?.id === userId) {
+        setSelectedUser({ ...selectedUser, role })
+      }
+    }
+  }
+
+  // Course management state
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const [isAddingCourse, setIsAddingCourse] = useState(false)
+
+  // Announcement State
+  const [newAnn, setNewAnn] = useState({ text: '', type: 'info' as Announcement['type'] })
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !editingCourse) return
+
+    setUploading(true)
+    const url = await uploadCourseImage(file)
+    if (url) {
+      setEditingCourse({ ...editingCourse, image: url })
+    } else {
+      alert('อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่')
+    }
+    setUploading(false)
+  }
+
+  // Overview Stats
+  const stats = useMemo(() => {
+    const now = new Date()
+    const todayStr = now.toISOString().slice(0, 10)
+    
+    const todayBookings = bookings.filter(b => b.date === todayStr && b.status !== 'cancelled')
+    const totalRevenue = bookings.reduce((sum, b) => {
+      if (b.status !== 'completed') return sum
+      const c = courses.find(x => x.id === b.courseId)
+      return sum + (c ? (c.price / (c.hours || 1)) * 2 : 0) // Estimating per 2h slot
+    }, 0)
+
+    const courseStats = courses.map(c => ({
+      name: c.name,
+      count: bookings.filter(b => b.courseId === c.id && b.status !== 'cancelled').length
+    })).sort((a, b) => b.count - a.count)
+
+    return {
+      todayCount: todayBookings.length,
+      totalCount: bookings.filter(b => b.status !== 'cancelled').length,
+      userCount: users.length,
+      estRevenue: totalRevenue,
+      popularCourses: courseStats.slice(0, 3)
+    }
+  }, [bookings, users, courses])
+
+  // Calendar blocking state
+  const [blockDate, setBlockDate] = useState(new Date().toISOString().slice(0, 10))
+
+  if (loading && tick === 0) return <div className="p-20 text-center text-slate-500">กำลังโหลดข้อมูล...</div>
+
+  const me = getAuthUser()
+  const isAdmin = me?.role === 'Admin'
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
+          <button
+            onClick={() => setTab('ops')}
+            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            Flight Simulator
+          </button>
+          {mode === 'admin' && (
+            <>
+          <button 
+            onClick={() => setTab('overview')} 
+            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            ภาพรวม
+          </button>
+          <button 
+            onClick={() => setTab('bookings')} 
+            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            รายการจอง
+          </button>
+          <button 
+            onClick={() => setTab('users')} 
+            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            นักเรียน
+          </button>
+            </>
+          )}
+          <button 
+            onClick={() => setTab('calendar')} 
+            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            ตารางบิน
+          </button>
+          {mode === 'admin' && (
+            <>
+          <button 
+             onClick={() => setTab('courses')} 
+             className={['px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+           >
+             จัดการคอร์ส
+           </button>
+           <button 
+             onClick={() => setTab('announcements')} 
+             className={['px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+           >
+             ประกาศ
+           </button>
+            </>
+          )}
+        </div>
+        
+        <button 
+          onClick={() => setTick(t => t+1)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm"
+        >
+          {loading ? '⏳ กำลังโหลด...' : '🔄 รีเฟรชข้อมูล'}
+        </button>
+      </div>
+
+      {tab === 'ops' && (
+        <div className="grid gap-6">
+          <div className="glass p-6">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+              <div className="flex-1">
+                <h2 className="text-xl font-bold">สถานะ Flight Simulator</h2>
+                <div className="text-sm text-slate-500 mt-1">กรณีไม่พร้อม ให้แจ้งเหตุผล และสร้างคำขอหา/เปลี่ยนคนแทนเพื่อแจ้งแอดมินก่อน</div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className={['px-2 py-1 rounded-lg text-xs font-bold uppercase', simDraftReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
+                    {simDraftReady ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
+                  </span>
+                  {simStatus?.updated_at && (
+                    <span className="text-[10px] text-slate-400">
+                      อัปเดตล่าสุด: {new Date(simStatus.updated_at).toLocaleString('th-TH')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => setSimDraftReady(true)}
+                    className={['btn', simDraftReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                  >
+                    พร้อม
+                  </button>
+                  <button
+                    onClick={() => setSimDraftReady(false)}
+                    className={['btn', !simDraftReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                  >
+                    ไม่พร้อม
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-2">
+                  <label className="text-sm font-semibold">หมายเหตุ / เหตุผล</label>
+                  <textarea
+                    value={simDraftNote}
+                    onChange={e => setSimDraftNote(e.target.value)}
+                    placeholder="เช่น เครื่องมีปัญหา, ระบบไม่พร้อม, ต้องการคนมาแทน ฯลฯ"
+                    className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24 focus:ring-2 focus:ring-brand-500 transition-all outline-none"
+                  />
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    disabled={simSaving}
+                    onClick={async () => {
+                      if (!simDraftReady && !simDraftNote.trim()) {
+                        alert('กรณีไม่พร้อม กรุณากรอกเหตุผลก่อนบันทึก')
+                        return
+                      }
+                      setSimSaving(true)
+                      const res = await setSimulatorStatus(simDraftReady, simDraftNote.trim() || undefined)
+                      setSimSaving(false)
+                      if (!res.ok) {
+                        alert(res.error)
+                        return
+                      }
+                      setTick(t => t + 1)
+                    }}
+                    className="btn btn-primary"
+                  >
+                    {simSaving ? 'กำลังบันทึก...' : 'บันทึกสถานะ'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSimDraftReady(simStatus?.ready ?? true)
+                      setSimDraftNote(simStatus?.note ? String(simStatus.note) : '')
+                    }}
+                    className="btn btn-outline"
+                  >
+                    ยกเลิกการแก้ไข
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-full md:w-[420px] rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-5">
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">แจ้งแอดมิน / หาแทน</div>
+                <div className="grid gap-3">
+                  <div className="grid gap-1">
+                    <label className="text-sm font-semibold">วันที่</label>
+                    <input
+                      type="date"
+                      value={reqDate}
+                      onChange={e => setReqDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-sm font-semibold">ช่วงเวลา</label>
+                    <select
+                      value={reqSlot}
+                      onChange={e => setReqSlot(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    >
+                      {TIME_SLOTS.map((t, i) => (
+                        <option key={t} value={i}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-sm font-semibold">คนแทน (ถ้ามี)</label>
+                    <input
+                      value={reqReplacementName}
+                      onChange={e => setReqReplacementName(e.target.value)}
+                      placeholder="ชื่อคนแทน"
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    />
+                    <input
+                      value={reqReplacementPhone}
+                      onChange={e => setReqReplacementPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="เบอร์ติดต่อคนแทน"
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-sm font-semibold">รายละเอียดแจ้งแอดมิน</label>
+                    <textarea
+                      value={reqNote}
+                      onChange={e => setReqNote(e.target.value)}
+                      placeholder="อธิบายเหตุผล/สถานการณ์ และสิ่งที่ต้องการให้แอดมินรับทราบ"
+                      className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24 focus:ring-2 focus:ring-brand-500 transition-all outline-none"
+                    />
+                  </div>
+                  <button
+                    disabled={reqSubmitting}
+                    onClick={async () => {
+                      if (!reqNote.trim()) {
+                        alert('กรุณากรอกรายละเอียดก่อนส่งแจ้งแอดมิน')
+                        return
+                      }
+                      setReqSubmitting(true)
+                      const res = await createReplacementRequest({
+                        date: reqDate,
+                        slot: reqSlot,
+                        replacement_name: reqReplacementName.trim() || undefined,
+                        replacement_phone: reqReplacementPhone.trim() || undefined,
+                        note: reqNote.trim()
+                      })
+                      setReqSubmitting(false)
+                      if (!res.ok) {
+                        alert(res.error)
+                        return
+                      }
+                      setReqNote('')
+                      setReqReplacementName('')
+                      setReqReplacementPhone('')
+                      setTick(t => t + 1)
+                    }}
+                    className="btn btn-primary w-full py-3"
+                  >
+                    {reqSubmitting ? 'กำลังส่ง...' : 'ส่งแจ้งแอดมิน'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass p-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <h3 className="font-bold">รายการแจ้งแอดมินล่าสุด</h3>
+              <button onClick={() => setTick(t => t + 1)} className="btn btn-outline">รีเฟรช</button>
+            </div>
+            <div className="grid gap-3">
+              {requests.slice(0, 10).map(r => (
+                <div key={r.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">
+                        {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {TIME_SLOTS[r.slot]}
+                      </div>
+                      <div className="text-sm text-slate-500 mt-1">{r.note}</div>
+                      {(r.replacement_name || r.replacement_phone) && (
+                        <div className="text-xs text-slate-500 mt-2">
+                          คนแทน: {r.replacement_name || '-'} {r.replacement_phone ? `(${r.replacement_phone})` : ''}
+                        </div>
+                      )}
+                      {r.admin_note && (
+                        <div className="mt-2 text-[10px] text-brand-700 bg-brand-50 dark:bg-brand-900/20 px-2 py-1 rounded-xl">
+                          หมายเหตุแอดมิน: {r.admin_note}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={[
+                        'px-2 py-1 rounded-lg text-[10px] font-black uppercase',
+                        r.status === 'pending_admin' ? 'bg-amber-100 text-amber-700' :
+                        r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                        r.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-slate-200 text-slate-700'
+                      ].join(' ')}>
+                        {r.status === 'pending_admin' ? 'รอแอดมิน' : r.status === 'approved' ? 'อนุมัติ' : r.status === 'rejected' ? 'ไม่อนุมัติ' : 'ยกเลิก'}
+                      </span>
+
+                      {isAdmin && r.status === 'pending_admin' && (
+                        <>
+                          <button
+                            onClick={async () => {
+                              const note = prompt('หมายเหตุแอดมิน (ถ้ามี)') || undefined
+                              const res = await updateReplacementRequestStatus(r.id, 'approved', note)
+                              if (!res.ok) alert(res.error)
+                              setTick(t => t + 1)
+                            }}
+                            className="btn btn-primary py-1.5 text-xs"
+                          >
+                            อนุมัติ
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const note = prompt('เหตุผล/หมายเหตุแอดมิน (ถ้ามี)') || undefined
+                              const res = await updateReplacementRequestStatus(r.id, 'rejected', note)
+                              if (!res.ok) alert(res.error)
+                              setTick(t => t + 1)
+                            }}
+                            className="btn btn-outline border-red-200 text-red-500 hover:bg-red-50 py-1.5 text-xs"
+                          >
+                            ปฏิเสธ
+                          </button>
+                        </>
+                      )}
+
+                      {!isAdmin && r.status === 'pending_admin' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm('ยืนยันการยกเลิกการแจ้งนี้?')) return
+                            const res = await updateReplacementRequestStatus(r.id, 'cancelled')
+                            if (!res.ok) alert(res.error)
+                            setTick(t => t + 1)
+                          }}
+                          className="btn btn-outline border-red-200 text-red-500 hover:bg-red-50 py-1.5 text-xs"
+                        >
+                          ยกเลิก
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {requests.length === 0 && (
+                <div className="text-center py-10 text-slate-400 italic">ยังไม่มีรายการแจ้งแอดมิน</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'overview' && (
+        <div className="grid gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="glass p-6">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">จองวันนี้ (Active)</div>
+              <div className="text-3xl font-bold text-brand-600">{stats.todayCount}</div>
+            </div>
+            <div className="glass p-6">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">จองสะสม (ไม่รวมยกเลิก)</div>
+              <div className="text-3xl font-bold">{stats.totalCount}</div>
+            </div>
+            <div className="glass p-6">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">นักเรียนทั้งหมด</div>
+              <div className="text-3xl font-bold">{stats.userCount}</div>
+            </div>
+            <div className="glass p-6">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">รายได้จริง (Completed)</div>
+              <div className="text-2xl font-bold text-emerald-600">฿{stats.estRevenue.toLocaleString()}</div>
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="glass p-6">
+              <h3 className="font-bold mb-4">คอร์สยอดนิยม (จอง Active)</h3>
+              <div className="grid gap-3">
+                {stats.popularCourses.map((c, i) => (
+                  <div key={c.name} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-3">
+                      <span className="size-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 grid place-items-center text-xs font-bold">{i+1}</span>
+                      <span className="font-medium">{c.name}</span>
+                    </div>
+                    <div className="font-bold">{c.count} จอง</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="glass p-6 flex flex-col justify-center items-center text-center">
+              <div className="text-4xl mb-3">👨‍✈️</div>
+              <h3 className="font-bold">โรงเรียนการบินพร้อมให้บริการ</h3>
+              <p className="text-sm text-slate-500 mt-1">ระบบทำงานปกติ ตรวจสอบตารางบินล่าสุดได้เสมอ</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'bookings' && (
+        <div className="glass overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+              <tr>
+                <th className="px-6 py-4">วันที่ / เวลา</th>
+                <th className="px-6 py-4">นักเรียน</th>
+                <th className="px-6 py-4">คอร์ส / สถานะ</th>
+                <th className="px-6 py-4">ติดต่อ</th>
+                <th className="px-6 py-4">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {bookings.map(b => (
+                <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                  <td className="px-6 py-4">
+                    <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                    <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium">{b.name}</div>
+                    <div className="text-xs text-slate-400">{b.email}</div>
+                    {b.note && (
+                      <div className="mt-1 text-[10px] text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-1.5 py-0.5 rounded italic">
+                        Note: {b.note}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="mb-2">
+                      <span className="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-xs font-medium">
+                        {courseMap[b.courseId] || b.courseId}
+                      </span>
+                    </div>
+                    {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
+                    {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
+                    {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">
+                    {b.phone}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      {b.status === 'pending' && (
+                        <>
+                          <button 
+                            onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
+                            className="text-emerald-500 hover:text-emerald-600 text-xs font-bold text-left"
+                          >
+                            Mark Completed
+                          </button>
+                          <button 
+                            onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
+                            className="text-red-500 hover:text-red-600 text-xs font-bold text-left"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {b.status !== 'pending' && (
+                        <button 
+                          onClick={async () => { await updateBookingStatus(b.id, 'pending'); setTick(t => t+1) }}
+                          className="text-slate-400 hover:text-slate-600 text-xs font-medium text-left"
+                        >
+                          Revert to Pending
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {bookings.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'users' && (
+        <div className="grid md:grid-cols-[1fr_1.5fr] gap-6">
+          <div className="glass overflow-hidden h-fit">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 font-semibold bg-slate-50/50 dark:bg-slate-900/50">นักเรียนทั้งหมด</div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto">
+              {users.map(u => (
+                <button 
+                  key={u.email} 
+                  onClick={() => setSelectedUser(u)}
+                  className={['w-full text-left px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative', selectedUser?.email === u.email ? 'bg-brand-50 dark:bg-brand-900/10 border-r-4 border-brand-500' : ''].join(' ')}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-semibold">{u.name || 'ไม่ระบุชื่อ'}</div>
+                      <div className="text-xs text-slate-400">{u.email}</div>
+                    </div>
+                    <span className={[
+                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded',
+                      u.role === 'Admin' ? 'bg-purple-100 text-purple-700' :
+                      u.role === 'Technician' ? 'bg-blue-100 text-blue-700' :
+                      u.role === 'Pilot' ? 'bg-emerald-100 text-emerald-700' :
+                      'bg-slate-100 text-slate-600'
+                    ].join(' ')}>
+                      {u.role}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass p-6">
+            {selectedUser ? (
+              <div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold">{selectedUser.name || 'ไม่ระบุชื่อ'}</h2>
+                    <p className="text-slate-500">{selectedUser.email}</p>
+                    <p className="text-slate-500">{selectedUser.phone || 'ไม่มีเบอร์โทร'}</p>
+                  </div>
+                  
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">กำหนดสิทธิ์การใช้งาน (Role)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {roles.map(r => (
+                        <button
+                          key={r}
+                          onClick={() => selectedUser.id && handleRoleChange(selectedUser.id, r)}
+                          className={[
+                            'px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2',
+                            selectedUser.role === r 
+                              ? 'border-brand-500 bg-brand-50 text-brand-600' 
+                              : 'border-transparent bg-white dark:bg-slate-800 text-slate-500 hover:border-slate-200'
+                          ].join(' ')}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <span className="w-1 h-5 bg-brand-500 rounded-full" />
+                  ประวัติการเรียน (Flight Log)
+                </h3>
+                
+                <div className="grid gap-4">
+                  {selectedUserFlightLog.map(log => {
+                    const percent = Math.min(100, Math.round((log.learned / log.hours) * 100))
+                    return (
+                      <div key={log.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="font-semibold">{log.name}</div>
+                          <div className="text-sm font-bold text-brand-600">{log.learned} / {log.hours} ชม.</div>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-500" style={{ width: `${percent}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {selectedUserFlightLog.length === 0 && (
+                    <div className="text-center py-8 text-slate-400 italic">ยังไม่มีประวัติการจองคอร์ส</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
+                <div className="text-4xl mb-4">👤</div>
+                <p>เลือกนักเรียนจากรายการเพื่อดูรายละเอียด</p>
+              </div>
+            )}
+          </div>
+        </div>
+       )}
+
+       {tab === 'courses' && (
+         <div className="grid gap-6">
+           <div className="flex justify-between items-center">
+             <h2 className="text-xl font-bold">จัดการคอร์สเรียน</h2>
+             <button 
+               onClick={() => {
+                 setEditingCourse({ id: Math.random().toString(36).slice(2), name: '', description: '', hours: 0, price: 0, image: '', tags: [] })
+                 setIsAddingCourse(true)
+               }} 
+               className="btn btn-primary"
+             >
+               + เพิ่มคอร์สใหม่
+             </button>
+           </div>
+
+           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {courses.map(c => (
+               <div key={c.id} className="glass overflow-hidden flex flex-col">
+                 <div className="aspect-[16/9] relative bg-slate-100 dark:bg-slate-800">
+                   <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="p-4 flex-1 flex flex-col">
+                   <div className="flex justify-between items-start mb-2">
+                     <h3 className="font-bold">{c.name}</h3>
+                     <span className="text-brand-600 font-bold">฿{c.price.toLocaleString()}</span>
+                   </div>
+                   <p className="text-sm text-slate-500 mb-4 line-clamp-2">{c.description}</p>
+                   <div className="mt-auto flex gap-2">
+                     <button 
+                       onClick={() => { setEditingCourse(c); setIsAddingCourse(false) }}
+                       className="btn btn-outline flex-1 py-1 text-xs"
+                     >
+                       แก้ไข
+                     </button>
+                     <button 
+                       onClick={async () => { 
+                         if(confirm('ยืนยันการลบคอร์สนี้?')) { 
+                           const res = await deleteCourse(c.id); 
+                           if (res.ok) {
+                             setTick(t => t+1) 
+                           } else {
+                             alert('ลบไม่สำเร็จ: ' + res.error)
+                           }
+                         } 
+                       }}
+                       className="btn btn-outline border-red-200 text-red-500 hover:bg-red-50 flex-1 py-1 text-xs"
+                     >
+                       ลบ
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+
+           {editingCourse && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+               <div className="glass p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                 <h3 className="text-xl font-bold mb-6">{isAddingCourse ? 'เพิ่มคอร์สใหม่' : 'แก้ไขคอร์ส'}</h3>
+                 <div className="grid gap-4">
+                   <div className="grid gap-1">
+                     <label className="text-xs font-bold text-slate-400 uppercase">รูปภาพคอร์ส</label>
+                     <div className="flex gap-4 items-start">
+                       {editingCourse.image && (
+                         <div className="size-24 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100">
+                           <img src={editingCourse.image} alt="Preview" className="w-full h-full object-cover" />
+                         </div>
+                       )}
+                       <div className="flex-1">
+                         <input 
+                           type="file" 
+                           ref={fileInputRef}
+                           onChange={handleImageUpload}
+                           accept="image/*"
+                           className="hidden"
+                         />
+                         <button 
+                           type="button"
+                           onClick={() => fileInputRef.current?.click()}
+                           disabled={uploading}
+                           className="btn btn-outline w-full py-4 border-dashed border-2 flex flex-col items-center justify-center gap-2"
+                         >
+                           {uploading ? (
+                             <>
+                               <span className="size-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                               <span className="text-[10px]">กำลังอัปโหลด...</span>
+                             </>
+                           ) : (
+                             <>
+                               <span className="text-xl">🖼️</span>
+                               <span className="text-[10px]">คลิกเพื่อเลือกรูปภาพ</span>
+                             </>
+                           )}
+                         </button>
+                         <div className="text-[10px] text-slate-400 mt-2">
+                           หรือระบุ URL รูปภาพโดยตรง:
+                           <input 
+                             className="mt-1 w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs" 
+                             value={editingCourse.image} 
+                             onChange={e => setEditingCourse({ ...editingCourse, image: e.target.value })} 
+                             placeholder="https://..."
+                           />
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="grid gap-1">
+                     <label className="text-sm font-semibold">ชื่อคอร์ส</label>
+                     <input 
+                       className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                       value={editingCourse.name}
+                       onChange={e => setEditingCourse({ ...editingCourse, name: e.target.value })}
+                     />
+                   </div>
+                   <div className="grid gap-1">
+                     <label className="text-sm font-semibold">รายละเอียด</label>
+                     <textarea 
+                       className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 h-24"
+                       value={editingCourse.description}
+                       onChange={e => setEditingCourse({ ...editingCourse, description: e.target.value })}
+                     />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div className="grid gap-1">
+                       <label className="text-sm font-semibold">ราคา (บาท)</label>
+                       <input 
+                         type="number"
+                         className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                         value={editingCourse.price}
+                         onChange={e => setEditingCourse({ ...editingCourse, price: Number(e.target.value) })}
+                       />
+                     </div>
+                     <div className="grid gap-1">
+                       <label className="text-sm font-semibold">ชั่วโมงทั้งหมด</label>
+                       <input 
+                         type="number"
+                         className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                         value={editingCourse.hours}
+                         onChange={e => setEditingCourse({ ...editingCourse, hours: Number(e.target.value) })}
+                       />
+                     </div>
+                   </div>
+
+                 </div>
+                 <div className="mt-8 flex gap-3">
+                   <button 
+                     onClick={async () => {
+                       if (isAddingCourse) await addCourse(editingCourse)
+                       else await updateCourse(editingCourse)
+                       setEditingCourse(null)
+                       setTick(t => t+1)
+                     }}
+                     className="btn btn-primary flex-1"
+                   >
+                     บันทึก
+                   </button>
+                   <button onClick={() => setEditingCourse(null)} className="btn btn-outline flex-1">ยกเลิก</button>
+                 </div>
+               </div>
+             </div>
+           )}
+         </div>
+       )}
+
+       {tab === 'calendar' && (
+        <div className="glass p-6">
+          <h2 className="text-xl font-bold mb-4">จัดการช่วงเวลาว่าง (Block Slots)</h2>
+          <p className="text-sm text-slate-500 mb-6">เลือกวันที่และคลิกที่ช่วงเวลาเพื่อ "เปิด/ปิด" การจอง (เช่น กรณีเครื่องบินซ่อมบำรุง หรือวันหยุดครู)</p>
+          
+          <div className="grid md:grid-cols-[300px_1fr] gap-8">
+            <div>
+              <label className="text-sm font-semibold mb-2 block">เลือกวันที่</label>
+              <input 
+                type="date" 
+                value={blockDate} 
+                onChange={e => setBlockDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {TIME_SLOTS.map((slot, i) => {
+                const isBlocked = (blockedMap[blockDate] || []).includes(i)
+                const isTaken = bookings.some(b => b.date === blockDate && b.slot === i)
+                
+                return (
+                  <button
+                    key={slot}
+                    disabled={isTaken}
+                    onClick={async () => { await toggleBlockSlot(blockDate, i); setTick(t => t+1) }}
+                    className={[
+                      'p-6 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32',
+                      isBlocked 
+                        ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/30 dark:bg-red-900/10' 
+                        : 'border-slate-100 bg-white hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900',
+                      isTaken ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                    ].join(' ')}
+                  >
+                    <div>
+                      <div className="font-bold">{slot}</div>
+                      <div className="text-xs opacity-70">สล็อตที่ {i + 1}</div>
+                    </div>
+                    <div className="flex items-center justify-between mt-auto">
+                      <span className={['text-xs px-2 py-0.5 rounded-full font-bold uppercase', isBlocked ? 'bg-red-200 text-red-800' : 'bg-emerald-100 text-emerald-800'].join(' ')}>
+                        {isBlocked ? 'ปิดการจอง' : 'เปิดว่าง'}
+                      </span>
+                      {isTaken && <span className="text-[10px] text-slate-500 font-medium">มีคนจองแล้ว</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+         </div>
+       )}
+
+       {tab === 'announcements' && (
+         <div className="grid gap-6">
+           <div className="glass p-6">
+             <h2 className="text-xl font-bold mb-6">สร้างประกาศใหม่</h2>
+             <div className="grid gap-4">
+               <textarea 
+                 placeholder="พิมพ์ข้อความประกาศที่นี่..."
+                 className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-32 focus:ring-2 focus:ring-brand-500 transition-all outline-none"
+                 value={newAnn.text}
+                 onChange={e => setNewAnn({ ...newAnn, text: e.target.value })}
+               />
+               <div className="flex flex-wrap items-center gap-4">
+                 <div className="flex gap-2">
+                   {(['info', 'warning', 'danger'] as const).map(t => (
+                     <button 
+                       key={t}
+                       onClick={() => setNewAnn({ ...newAnn, type: t })}
+                       className={['px-3 py-1.5 rounded-xl text-xs font-bold uppercase transition-all border-2', newAnn.type === t ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-transparent bg-slate-100 dark:bg-slate-800 text-slate-500'].join(' ')}
+                     >
+                       {t}
+                     </button>
+                   ))}
+                 </div>
+                 <button 
+                   onClick={async () => {
+                     if(!newAnn.text.trim()) return
+                     await addAnnouncement(newAnn)
+                     setNewAnn({ text: '', type: 'info' })
+                     setTick(t => t+1)
+                   }}
+                   className="btn btn-primary ml-auto"
+                 >
+                   ลงประกาศ
+                 </button>
+               </div>
+             </div>
+           </div>
+
+           <div className="grid gap-4">
+             <h3 className="font-bold">รายการประกาศปัจจุบัน</h3>
+             {announcements.map(a => (
+               <div key={a.id} className="glass p-4 flex items-start justify-between gap-4">
+                 <div className="flex gap-3">
+                   <div className={['size-2 mt-2 rounded-full shrink-0', a.type === 'danger' ? 'bg-red-500' : a.type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'].join(' ')} />
+                   <div>
+                     <p className="text-sm">{a.text}</p>
+                     <div className="text-[10px] text-slate-400 mt-1">{new Date(a.date).toLocaleString('th-TH')}</div>
+                   </div>
+                 </div>
+                 <button 
+                   onClick={async () => { await deleteAnnouncement(a.id); setTick(t => t+1) }}
+                   className="text-red-500 hover:text-red-600 p-1"
+                 >
+                   🗑️
+                 </button>
+               </div>
+             ))}
+             {announcements.length === 0 && (
+               <div className="text-center py-12 text-slate-400 italic glass">ยังไม่มีประกาศ</div>
+             )}
+           </div>
+         </div>
+       )}
+     </div>
+   )
+}
