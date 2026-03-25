@@ -625,34 +625,34 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       )}
 
       {tab === 'bookings' && (
-        <div className="glass overflow-hidden">
-          <table className="w-full text-left text-sm">
+        <div className="glass overflow-x-auto">
+          <table className="min-w-[920px] w-full text-left text-sm">
             <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
               <tr>
-                <th className="px-6 py-4">วันที่ / เวลา</th>
-                <th className="px-6 py-4">นักเรียน</th>
-                <th className="px-6 py-4">คอร์ส / สถานะ</th>
-                <th className="px-6 py-4">ติดต่อ</th>
-                <th className="px-6 py-4">จัดการ</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">วันที่ / เวลา</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">นักเรียน</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">คอร์ส / สถานะ</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">ติดต่อ</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {bookings.map(b => (
                 <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                     <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                     <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div className="font-medium">{b.name}</div>
-                    <div className="text-xs text-slate-400">{b.email}</div>
+                    <div className="text-xs text-slate-400 truncate max-w-[320px]">{b.email}</div>
                     {b.note && (
                       <div className="mt-1 text-[10px] text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-1.5 py-0.5 rounded italic">
                         Note: {b.note}
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div className="mb-2">
                       <span className="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-xs font-medium">
                         {courseMap[b.courseId] || b.courseId}
@@ -662,10 +662,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
                     {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
                   </td>
-                  <td className="px-6 py-4 text-slate-500 text-xs">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-slate-500 text-xs whitespace-nowrap">
                     {b.phone}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div className="flex flex-col gap-1">
                       {b.status === 'pending' && (
                         <>
@@ -697,7 +697,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               ))}
               {bookings.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
+                  <td colSpan={5} className="px-3 sm:px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
                 </tr>
               )}
             </tbody>
