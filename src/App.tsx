@@ -301,10 +301,9 @@ export default function App() {
       )}
 
       {view === 'browse' && !isStaff && (
-        <div className="grid xl:grid-cols-[1fr_320px] gap-6 items-start">
-          <div className="grid gap-6">
+        <div className="grid gap-6">
             {step === 'select' && (
-              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
+              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
                 {filteredCourses.map(c => (
                   <div key={c.id} className="glass p-6 flex flex-col justify-between">
                     <div>
@@ -521,14 +520,6 @@ export default function App() {
                 </div>
               </section>
             )}
-          </div>
-          <div className="hidden xl:grid gap-6">
-            <div className="glass p-6 bg-brand-500 text-white border-none shadow-lg shadow-brand-200 dark:shadow-none">
-              <div className="text-xs text-white/70 font-bold uppercase tracking-widest mb-1">ความพร้อม</div>
-              <div className="text-3xl font-black">24</div>
-              <div className="text-white/80 text-[10px] font-medium">สล็อตว่างใน 7 วันถัดไป</div>
-            </div>
-          </div>
         </div>
       )}
 
