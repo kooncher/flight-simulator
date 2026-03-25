@@ -63,8 +63,15 @@ export default function App() {
   useEffect(() => {
     const isAdmin = user?.role === 'Admin'
     const isStaff = user?.role === 'Technician' || user?.role === 'Pilot'
-    if (isAdmin && view !== 'admin') setView('admin')
-    if (isStaff && (view === 'browse' || view === 'admin')) setView('staff')
+    if (isAdmin) {
+      if (view !== 'admin') setView('admin')
+      return
+    }
+    if (isStaff) {
+      if (view === 'browse' || view === 'admin') setView('staff')
+      return
+    }
+    if (view === 'admin' || view === 'staff') setView('browse')
   }, [user, view])
 
   useEffect(() => {
@@ -251,7 +258,7 @@ export default function App() {
     <AppLayout
       userEmail={user.email}
       userName={user.name || user.email}
-      onLogout={() => { logout(); setUser(null) }}
+      onLogout={() => { logout(); setUser(null); setView('browse'); resetFlow() }}
       q={q}
       setQ={setQ}
       availability={availability}
