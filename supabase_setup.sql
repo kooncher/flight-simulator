@@ -84,9 +84,12 @@ CREATE TABLE profiles (
   email TEXT NOT NULL,
   name TEXT,
   phone TEXT,
+  address TEXT,
   role TEXT DEFAULT 'User', -- 'Admin', 'Technician', 'Pilot', 'User'
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS address TEXT;
 
 -- RLS for Profiles
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -98,8 +101,8 @@ CREATE POLICY "Allow admin to update any profile" ON profiles FOR UPDATE USING (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, role)
-  VALUES (new.id, new.email, 'User');
+  INSERT INTO public.profiles (id, email, role, name, phone, address)
+  VALUES (new.id, new.email, 'User', NULL, NULL, NULL);
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

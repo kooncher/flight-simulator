@@ -8,6 +8,10 @@ type Props = {
 export default function Login({ onSuccess }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
   const [show, setShow] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -17,8 +21,37 @@ export default function Login({ onSuccess }: Props) {
     setLoading(true)
     setError(null)
     
+    if (isSignup) {
+      const cleanPhone = phone.replace(/\D/g, '').slice(0, 10)
+      if (!firstName.trim()) {
+        setError('กรุณากรอกชื่อ')
+        setLoading(false)
+        return
+      }
+      if (!lastName.trim()) {
+        setError('กรุณากรอกนามสกุล')
+        setLoading(false)
+        return
+      }
+      if (cleanPhone.length !== 10) {
+        setError('เบอร์โทรต้องเป็นตัวเลข 10 หลัก')
+        setLoading(false)
+        return
+      }
+      if (!address.trim()) {
+        setError('กรุณากรอกที่อยู่')
+        setLoading(false)
+        return
+      }
+    }
+    
     const res = isSignup 
-      ? await signup(email.trim(), password)
+      ? await signup(email.trim(), password, {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: phone.replace(/\D/g, '').slice(0, 10),
+          address: address.trim()
+        })
       : await login(email.trim(), password)
       
     if ('ok' in res && res.ok) {
@@ -50,6 +83,52 @@ export default function Login({ onSuccess }: Props) {
               placeholder="you@example.com"
             />
           </div>
+
+          {isSignup && (
+            <>
+              <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                <div className="grid gap-1 flex-1 min-w-0">
+                  <label className="text-sm text-slate-600 dark:text-slate-300">ชื่อ</label>
+                  <input
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    placeholder="ชื่อ"
+                  />
+                </div>
+                <div className="grid gap-1 flex-1 min-w-0">
+                  <label className="text-sm text-slate-600 dark:text-slate-300">นามสกุล</label>
+                  <input
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    placeholder="นามสกุล"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-1">
+                <label className="text-sm text-slate-600 dark:text-slate-300">เบอร์โทรศัพท์</label>
+                <input
+                  inputMode="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/[\u0E00-\u0E7F]/g, '').replace(/\D/g, '').slice(0, 10))}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                  placeholder="0XXXXXXXXX"
+                />
+              </div>
+
+              <div className="grid gap-1">
+                <label className="text-sm text-slate-600 dark:text-slate-300">ที่อยู่</label>
+                <textarea
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24"
+                  placeholder="ที่อยู่สำหรับติดต่อ/ออกเอกสาร"
+                />
+              </div>
+            </>
+          )}
           <div className="grid gap-1">
             <label className="text-sm text-slate-600 dark:text-slate-300">รหัสผ่าน</label>
             <div className="flex gap-2">

@@ -7,6 +7,7 @@ export type User = {
   email: string
   name?: string
   phone?: string
+  address?: string
   role?: UserRole
 }
 
@@ -24,7 +25,7 @@ function normalizeRole(v: any): UserRole {
   return 'User'
 }
 
-async function ensureProfileRow(input: { id: string; email: string; name?: string; phone?: string; role?: any }) {
+async function ensureProfileRow(input: { id: string; email: string; name?: string; phone?: string; address?: string; role?: any }) {
   const role = normalizeRole(input.role)
   await supabase
     .from('profiles')
@@ -34,6 +35,7 @@ async function ensureProfileRow(input: { id: string; email: string; name?: strin
         email: input.email,
         name: input.name ?? null,
         phone: input.phone ?? null,
+        address: input.address ?? null,
         role
       },
       { onConflict: 'id' }
@@ -62,6 +64,7 @@ export async function getAllUsers(): Promise<User[]> {
     email: p.email as string,
     name: p.name as string | undefined,
     phone: p.phone as string | undefined,
+    address: p.address as string | undefined,
     role: p.role as UserRole
   }))
 }
@@ -83,6 +86,7 @@ export async function login(email: string, password: string): Promise<{ ok: true
     const metaRole = normalizeRole((data.user as any).user_metadata?.role)
     const metaName = (data.user as any).user_metadata?.name as string | undefined
     const metaPhone = (data.user as any).user_metadata?.phone as string | undefined
+    const metaAddress = (data.user as any).user_metadata?.address as string | undefined
 
     const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle()
     if (profileErr || !profile) {
@@ -91,6 +95,7 @@ export async function login(email: string, password: string): Promise<{ ok: true
         email: data.user.email!,
         name: metaName,
         phone: metaPhone,
+        address: metaAddress,
         role: metaRole
       })
     }
@@ -102,7 +107,8 @@ export async function login(email: string, password: string): Promise<{ ok: true
       email: data.user.email!, 
       role: normalizeRole((profile2 as any)?.role ?? metaRole),
       name: ((profile2 as any)?.name as string | undefined) || metaName,
-      phone: ((profile2 as any)?.phone as string | undefined) || metaPhone
+      phone: ((profile2 as any)?.phone as string | undefined) || metaPhone,
+      address: ((profile2 as any)?.address as string | undefined) || metaAddress
     }
     localStorage.setItem(KEY, JSON.stringify(user))
     return { ok: true, user }
@@ -111,16 +117,27 @@ export async function login(email: string, password: string): Promise<{ ok: true
   return { ok: false, error: 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ' }
 }
 
-export async function signup(email: string, password: string): Promise<{ ok: true; user: User } | { ok: false; error: string }> {
+export async function signup(
+  email: string,
+  password: string,
+  profile?: { firstName: string; lastName: string; phone: string; address: string }
+): Promise<{ ok: true; user: User } | { ok: false; error: string }> {
   if (!email || !/.+@.+\..+/.test(email)) return { ok: false, error: 'อีเมลไม่ถูกต้อง' }
   if (!password || password.length < 6) return { ok: false, error: 'รหัสผ่านอย่างน้อย 6 ตัวอักษร' }
+
+  const fullName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : undefined
+  const phoneDigits = profile ? profile.phone.replace(/\D/g, '').slice(0, 10) : undefined
+  const addressText = profile ? profile.address.trim() : undefined
   
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        role: 'User'
+        role: 'User',
+        name: fullName,
+        phone: phoneDigits,
+        address: addressText
       }
     }
   })
@@ -130,10 +147,23 @@ export async function signup(email: string, password: string): Promise<{ ok: tru
   }
 
   if (data.user) {
+    if (profile) {
+      await ensureProfileRow({
+        id: data.user.id,
+        email: data.user.email!,
+        name: fullName,
+        phone: phoneDigits,
+        address: addressText,
+        role: 'User'
+      })
+    }
     const user: User = { 
       id: data.user.id,
       email: data.user.email!, 
-      role: 'User'
+      role: 'User',
+      name: fullName,
+      phone: phoneDigits,
+      address: addressText
     }
     localStorage.setItem(KEY, JSON.stringify(user))
     return { ok: true, user }
@@ -155,6 +185,7 @@ export async function updateUser(partial: Partial<User>) {
   const { error: pError } = await supabase.from('profiles').update({
     name: partial.name,
     phone: partial.phone,
+    address: partial.address,
     role: partial.role
   }).eq('id', u.id)
 
@@ -164,7 +195,8 @@ export async function updateUser(partial: Partial<User>) {
   await supabase.auth.updateUser({
     data: {
       name: partial.name || u.name,
-      phone: partial.phone || u.phone
+      phone: partial.phone || u.phone,
+      address: partial.address || u.address
     }
   })
 
@@ -185,6 +217,7 @@ export async function checkSession() {
     const metaRole = normalizeRole((session.user as any).user_metadata?.role)
     const metaName = (session.user as any).user_metadata?.name as string | undefined
     const metaPhone = (session.user as any).user_metadata?.phone as string | undefined
+    const metaAddress = (session.user as any).user_metadata?.address as string | undefined
 
     const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
     if (profileErr || !profile) {
@@ -193,6 +226,7 @@ export async function checkSession() {
         email: session.user.email!,
         name: metaName,
         phone: metaPhone,
+        address: metaAddress,
         role: metaRole
       })
     }
@@ -204,7 +238,8 @@ export async function checkSession() {
       email: session.user.email!, 
       role: normalizeRole((profile2 as any)?.role ?? metaRole),
       name: ((profile2 as any)?.name as string | undefined) || metaName,
-      phone: ((profile2 as any)?.phone as string | undefined) || metaPhone
+      phone: ((profile2 as any)?.phone as string | undefined) || metaPhone,
+      address: ((profile2 as any)?.address as string | undefined) || metaAddress
     }
     localStorage.setItem(KEY, JSON.stringify(user))
     return user
