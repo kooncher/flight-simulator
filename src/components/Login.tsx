@@ -64,7 +64,7 @@ export default function Login({ onSuccess }: Props) {
 
   return (
     <div className="min-h-[70vh] grid place-items-center">
-      <div className="glass p-8 w-full max-w-md">
+      <div className="glass p-6 sm:p-8 w-full max-w-md">
         <div className="text-2xl font-semibold text-center">{isSignup ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}</div>
         <div className="mt-6 grid gap-4">
           <div className="grid gap-1">

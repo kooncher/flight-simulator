@@ -66,12 +66,12 @@ export default function Header({ loggedIn, onLogout, userName }: Props) {
   }
   return (
     <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/50 border-b border-white/20 dark:border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="size-9 rounded-xl bg-gradient-to-tr from-brand-500 to-cyan-400 grid place-items-center text-white font-bold">✈</div>
-          <div className="text-xl font-semibold">Flight Reserve</div>
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="size-8 sm:size-9 rounded-xl bg-gradient-to-tr from-brand-500 to-cyan-400 grid place-items-center text-white font-bold">✈</div>
+          <div className="text-lg sm:text-xl font-semibold truncate">Flight Reserve</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {loggedIn && userName && <div className="hidden sm:block px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">{userName}</div>}
           {loggedIn && (
             <button onClick={onLogout} className="btn btn-outline px-3" aria-label="ออกจากระบบ" title="ออกจากระบบ">
