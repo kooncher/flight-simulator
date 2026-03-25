@@ -170,12 +170,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
+      <div className="grid gap-4">
+        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto whitespace-nowrap">
           {mode === 'staff' && (
             <button
               onClick={() => setTab('ops')}
-              className={['px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
             >
               <span className="inline-flex items-center gap-2">
                 <span>Flight Simulator</span>
@@ -186,7 +186,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
             <>
           <button 
             onClick={() => setTab('overview')} 
-            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
             <span className="inline-flex items-center gap-2">
               <span>ภาพรวม</span>
@@ -199,13 +199,13 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           </button>
           <button 
             onClick={() => setTab('bookings')} 
-            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
             รายการจอง
           </button>
           <button 
             onClick={() => setTab('users')} 
-            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
             นักเรียน
           </button>
@@ -213,7 +213,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           )}
           <button 
             onClick={() => setTab('calendar')} 
-            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
             ตารางบิน
           </button>
@@ -221,28 +221,28 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
             <>
           <button 
              onClick={() => setTab('courses')} 
-             className={['px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+             className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
            >
              จัดการคอร์ส
            </button>
            <button 
              onClick={() => setTab('announcements')} 
-             className={['px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+             className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
            >
              ประกาศ
            </button>
             </>
           )}
+        <div className="flex items-center justify-end">
+          <button 
+            onClick={() => setTick(t => t+1)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm"
+          >
+            {loading ? '⏳ กำลังโหลด...' : '🔄 รีเฟรชข้อมูล'}
+          </button>
         </div>
-        
-        <button 
-          onClick={() => setTick(t => t+1)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm"
-        >
-          {loading ? '⏳ กำลังโหลด...' : '🔄 รีเฟรชข้อมูล'}
-        </button>
+        </div>
       </div>
-
       {tab === 'ops' && (
         <div className="grid gap-6">
           <div className="glass p-6">
