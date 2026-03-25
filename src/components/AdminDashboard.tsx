@@ -1,5 +1,5 @@
 import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, type SimulatorStatus, type ReplacementRequest } from '../store/booking'
-import { getAllUsers, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
+import { getAllUsers, getUsersByRole, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
 import { useEffect, useMemo, useState, useRef } from 'react'
 
 type Props = {
@@ -32,6 +32,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   const [reqReplacementPhone, setReqReplacementPhone] = useState('')
   const [reqNote, setReqNote] = useState('')
   const [reqSubmitting, setReqSubmitting] = useState(false)
+  const [staffList, setStaffList] = useState<User[]>([])
 
   useEffect(() => {
     async function loadData() {
@@ -63,6 +64,14 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
 
       setSimDraftReady(sim?.ready ?? true)
       setSimDraftNote(sim?.note ? String(sim.note) : '')
+      const me = getAuthUser()
+      const roleForReplacement: UserRole | null = me?.role === 'Pilot' ? 'Pilot' : (me?.role === 'Technician' ? 'Technician' : null)
+      if (roleForReplacement) {
+        const list = await getUsersByRole(roleForReplacement)
+        setStaffList(list.filter(x => x.id !== me?.id))
+      } else {
+        setStaffList([])
+      }
       setLoading(false)
     }
     loadData()
@@ -314,6 +323,23 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                   </div>
                   <div className="grid gap-1">
                     <label className="text-sm font-semibold">คนแทน (ถ้ามี)</label>
+                    {staffList.length > 0 && (
+                      <select
+                        onChange={e => {
+                          const u = staffList.find(x => x.id === e.target.value)
+                          setReqReplacementName(u?.name || u?.email || '')
+                          setReqReplacementPhone((u?.phone || '').replace(/\D/g, '').slice(0, 10))
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 mb-2"
+                      >
+                        <option value="">เลือกจากรายชื่อ{getAuthUser()?.role === 'Pilot' ? 'นักบิน' : 'ช่างซ่อม'}ในระบบ</option>
+                        {staffList.map(u => (
+                          <option key={u.id} value={u.id}>
+                            {(u.name || u.email)}{u.phone ? ` • ${u.phone}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <input
                       value={reqReplacementName}
                       onChange={e => setReqReplacementName(e.target.value)}

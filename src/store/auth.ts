@@ -27,7 +27,7 @@ function normalizeRole(v: any): UserRole {
 
 async function ensureProfileRow(input: { id: string; email: string; name?: string; phone?: string; address?: string; role?: any }) {
   const role = normalizeRole(input.role)
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .upsert(
       {
@@ -40,6 +40,7 @@ async function ensureProfileRow(input: { id: string; email: string; name?: strin
       },
       { onConflict: 'id' }
     )
+  if (error) console.error('ensureProfileRow error:', error.message)
 }
 
 export function getUser(): User | null {
@@ -58,6 +59,19 @@ export function isLoggedIn() {
 
 export async function getAllUsers(): Promise<User[]> {
   const { data, error } = await supabase.from('profiles').select('*')
+  if (error) return []
+  return (data as any[]).map(p => ({
+    id: p.id as string,
+    email: p.email as string,
+    name: p.name as string | undefined,
+    phone: p.phone as string | undefined,
+    address: p.address as string | undefined,
+    role: p.role as UserRole
+  }))
+}
+
+export async function getUsersByRole(role: UserRole): Promise<User[]> {
+  const { data, error } = await supabase.from('profiles').select('*').eq('role', role)
   if (error) return []
   return (data as any[]).map(p => ({
     id: p.id as string,

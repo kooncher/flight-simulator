@@ -96,6 +96,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow users to read all profiles" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Allow users to update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Allow admin to update any profile" ON profiles FOR UPDATE USING (auth.jwt() ->> 'email' = 'admin@flight.com');
+CREATE POLICY "Allow users insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Trigger to create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
