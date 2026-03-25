@@ -79,7 +79,7 @@ export default function Login({ onSuccess }: Props) {
               }}
               type="email"
               inputMode="email"
-              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
               placeholder="you@example.com"
             />
           </div>
@@ -113,7 +113,7 @@ export default function Login({ onSuccess }: Props) {
                   inputMode="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value.replace(/[\u0E00-\u0E7F]/g, '').replace(/\D/g, '').slice(0, 10))}
-                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                   placeholder="0XXXXXXXXX"
                 />
               </div>
@@ -123,7 +123,7 @@ export default function Login({ onSuccess }: Props) {
                 <textarea
                   value={address}
                   onChange={e => setAddress(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24"
                   placeholder="ที่อยู่สำหรับติดต่อ/ออกเอกสาร"
                 />
               </div>
@@ -131,9 +131,9 @@ export default function Login({ onSuccess }: Props) {
           )}
           <div className="grid gap-1">
             <label className="text-sm text-slate-600 dark:text-slate-300">รหัสผ่าน</label>
-            <div className="flex gap-2">
-              <input value={password} onChange={e => setPassword(e.target.value)} type={show ? 'text' : 'password'} className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" placeholder="อย่างน้อย 6 ตัวอักษร" />
-              <button onClick={() => setShow(s => !s)} className="btn btn-outline min-w-[88px]">{show ? 'ซ่อน' : 'แสดง'}</button>
+            <div className="flex gap-2 min-w-0">
+              <input value={password} onChange={e => setPassword(e.target.value)} type={show ? 'text' : 'password'} className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" placeholder="อย่างน้อย 6 ตัวอักษร" />
+              <button onClick={() => setShow(s => !s)} className="btn btn-outline min-w-[72px] sm:min-w-[88px]">{show ? 'ซ่อน' : 'แสดง'}</button>
             </div>
           </div>
           {error && <div className="text-red-600 text-sm">{error}</div>}
