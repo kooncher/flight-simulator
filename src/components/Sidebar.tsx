@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { UserRole } from '../store/auth'
+import { DEFAULT_SLOTS } from '../store/booking'
 
 type Props = {
   q: string
@@ -26,7 +27,7 @@ export default function Sidebar({ q, setQ, availability, userEmail, view, onNavi
       const d = new Date(today)
       d.setDate(today.getDate() + i)
       const key = d.toISOString().slice(0, 10)
-      sum += availability[key] || 0
+      sum += availability[key] ?? DEFAULT_SLOTS
     }
     return sum
   }, [availability])

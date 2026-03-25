@@ -178,7 +178,7 @@ export default function App() {
     const takenArr = await getTakenSlots(key)
     setTakenSlotsForDate(takenArr)
     const taken = new Set(takenArr)
-    const first = [0,1,2,3].find(i => !taken.has(i)) ?? null
+    const first = Array.from({ length: TIME_SLOTS.length }, (_, i) => i).find(i => !taken.has(i)) ?? null
     setSelectedSlot(first)
     setStep('form')
   }

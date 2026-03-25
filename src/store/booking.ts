@@ -25,9 +25,9 @@ export type Booking = {
   note?: string
 }
 
-export const DEFAULT_SLOTS = 4
-export const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '12:00–14:00', '14:00–16:00']
-export const SLOT_START_HOURS = [8, 10, 12, 14]
+export const DEFAULT_SLOTS = 5
+export const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '13:00–15:00', '15:00–17:00', '17:00–19:00']
+export const SLOT_START_HOURS = [8, 10, 13, 15, 17]
 
 export function slotStartDate(date: string, slot: number) {
   const [y, m, d] = date.split('-').map(Number)
