@@ -32,7 +32,7 @@ export default function Sidebar({ q, setQ, availability, userEmail, view, onNavi
   }, [availability])
 
   return (
-    <aside className="grid gap-4 lg:sticky lg:top-24 self-start lg:max-h-[calc(100vh-8rem)] overflow-auto">
+    <aside className="grid gap-4 lg:sticky lg:top-24 self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-auto">
       {isStaff && (
         <div className="glass p-4 border-l-4 border-brand-500">
           <div className="text-[10px] text-brand-600 font-black uppercase tracking-widest mb-2 flex items-center justify-between">
