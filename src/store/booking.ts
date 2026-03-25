@@ -400,6 +400,8 @@ export type ReplacementRequest = {
   note?: string | null
   status: ReplacementRequestStatus
   admin_note?: string | null
+  acknowledged_by?: string | null
+  acknowledged_at?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -480,6 +482,23 @@ export async function updateReplacementRequestStatus(id: string, status: Replace
       status,
       admin_note: adminNote ?? null,
       updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  return { ok: true as const }
+}
+
+export async function acknowledgeReplacementRequest(id: string) {
+  const user = getAuthUser()
+  if (!user?.id) return { ok: false as const, error: 'กรุณาเข้าสู่ระบบ' }
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('replacement_requests')
+    .update({
+      status: 'acknowledged',
+      acknowledged_by: user.id,
+      acknowledged_at: now,
+      updated_at: now
     })
     .eq('id', id)
   if (error) return { ok: false as const, error: error.message }

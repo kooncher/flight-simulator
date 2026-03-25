@@ -145,11 +145,16 @@ CREATE TABLE IF NOT EXISTS replacement_requests (
   replacement_name TEXT,
   replacement_phone TEXT,
   note TEXT NOT NULL,
-  status TEXT DEFAULT 'pending_admin', -- pending_admin, approved, rejected, cancelled
+  status TEXT DEFAULT 'pending_admin', -- pending_admin, acknowledged, approved, rejected, cancelled
   admin_note TEXT,
+  acknowledged_by UUID REFERENCES auth.users(id),
+  acknowledged_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE replacement_requests ADD COLUMN IF NOT EXISTS acknowledged_by UUID REFERENCES auth.users(id);
+ALTER TABLE replacement_requests ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
 
 ALTER TABLE simulator_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE replacement_requests ENABLE ROW LEVEL SECURITY;

@@ -1,4 +1,4 @@
-import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, type SimulatorStatus, type ReplacementRequest } from '../store/booking'
+import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, acknowledgeReplacementRequest, type SimulatorStatus, type ReplacementRequest } from '../store/booking'
 import { getAllUsers, getUsersByRole, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
 import { useEffect, useMemo, useState, useRef } from 'react'
 
@@ -84,6 +84,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   }, {} as Record<string, User>), [users])
   const pendingRequests = useMemo(() => requests.filter(r => r.status === 'pending_admin'), [requests])
   const pendingCount = pendingRequests.length
+  const acknowledgedRequests = useMemo(() => {
+    return requests
+      .filter(r => r.status === 'acknowledged')
+      .slice()
+      .sort((a, b) => String(b.acknowledged_at || b.updated_at || '').localeCompare(String(a.acknowledged_at || a.updated_at || '')))
+  }, [requests])
   
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [selectedUserFlightLog, setSelectedUserFlightLog] = useState<any[]>([])
@@ -549,7 +555,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                             <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-red-100 text-red-700">ใหม่</span>
                             <button
                               onClick={async () => {
-                                const res = await updateReplacementRequestStatus(r.id, 'acknowledged')
+                                const res = await acknowledgeReplacementRequest(r.id)
                                 if (!res.ok) {
                                   alert(res.error)
                                   return
@@ -569,6 +575,30 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                   <div className="text-sm text-slate-500">ยังไม่มีรายการรออนุมัติ</div>
                 )}
               </div>
+              {acknowledgedRequests.length > 0 && (
+                <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">รับทราบล่าสุด</div>
+                  <div className="grid gap-2">
+                    {acknowledgedRequests.slice(0, 5).map(r => {
+                      const who = userById[r.created_by]
+                      const whoLabel = who?.name || who?.email || 'ไม่ทราบผู้ส่ง'
+                      const ackBy = r.acknowledged_by ? userById[r.acknowledged_by] : undefined
+                      const ackLabel = ackBy?.name || ackBy?.email || 'แอดมิน'
+                      const when = r.acknowledged_at || r.updated_at
+                      return (
+                        <div key={r.id} className="flex items-center justify-between gap-3 text-xs text-slate-500">
+                          <div className="min-w-0 truncate">
+                            {whoLabel} • {TIME_SLOTS[r.slot]} • {new Date(r.date).toLocaleDateString('th-TH')}
+                          </div>
+                          <div className="shrink-0 text-[10px] text-slate-400">
+                            {ackLabel}{when ? ` • ${new Date(when).toLocaleString('th-TH')}` : ''}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="glass p-6 flex flex-col justify-center items-center text-center">
               <div className="text-4xl mb-3">👨‍✈️</div>
