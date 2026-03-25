@@ -28,7 +28,7 @@ Core transaction table.
 - `user_id` (UUID, FK): References users.id
 - `course_id` (Text/UUID, FK): References courses.id
 - `booking_date` (Date): YYYY-MM-DD
-- `slot_index` (Integer): 0-3 (representing 09:00, 11:00, etc.)
+- `slot_index` (Integer): 0-3 (representing 08:00, 10:00, etc.)
 - `status` (Text): 'confirmed' | 'cancelled' | 'completed'
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)

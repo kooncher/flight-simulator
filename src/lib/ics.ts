@@ -6,7 +6,7 @@ function pad(n: number) {
 
 export function buildICS(summary: string, date: string, slot: number, location = 'Flight Reserve') {
   const [y, m, d] = date.split('-').map(Number)
-  const startH = SLOT_START_HOURS[slot] || 9
+  const startH = SLOT_START_HOURS[slot] || 8
   const endH = startH + 2
   const dtstamp = new Date()
   const uid = Math.random().toString(36).slice(2) + '@flightreserve.local'

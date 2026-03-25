@@ -26,12 +26,12 @@ export type Booking = {
 }
 
 export const DEFAULT_SLOTS = 4
-export const TIME_SLOTS = ['09:00–11:00', '11:00–13:00', '13:00–15:00', '15:00–17:00']
-export const SLOT_START_HOURS = [9, 11, 13, 15]
+export const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '12:00–14:00', '14:00–16:00']
+export const SLOT_START_HOURS = [8, 10, 12, 14]
 
 export function slotStartDate(date: string, slot: number) {
   const [y, m, d] = date.split('-').map(Number)
-  const dt = new Date(y, (m - 1), d, SLOT_START_HOURS[slot] || 9, 0, 0, 0)
+  const dt = new Date(y, (m - 1), d, SLOT_START_HOURS[slot] || 8, 0, 0, 0)
   return dt
 }
 
