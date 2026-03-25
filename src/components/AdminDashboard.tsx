@@ -78,6 +78,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   }, [tick, mode])
 
   const courseMap = useMemo(() => courses.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {} as any), [courses])
+  const userById = useMemo(() => users.reduce((acc, u) => {
+    if (u.id) acc[u.id] = u
+    return acc
+  }, {} as Record<string, User>), [users])
+  const pendingRequests = useMemo(() => requests.filter(r => r.status === 'pending_admin'), [requests])
+  const pendingCount = pendingRequests.length
   
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [selectedUserFlightLog, setSelectedUserFlightLog] = useState<any[]>([])
@@ -160,19 +166,30 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-          <button
-            onClick={() => setTab('ops')}
-            className={['px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            Flight Simulator
-          </button>
+          {mode === 'staff' && (
+            <button
+              onClick={() => setTab('ops')}
+              className={['px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            >
+              <span className="inline-flex items-center gap-2">
+                <span>Flight Simulator</span>
+              </span>
+            </button>
+          )}
           {mode === 'admin' && (
             <>
           <button 
             onClick={() => setTab('overview')} 
             className={['px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
-            ภาพรวม
+            <span className="inline-flex items-center gap-2">
+              <span>ภาพรวม</span>
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-lg text-[10px] font-black bg-red-100 text-red-700">
+                  {pendingCount}
+                </span>
+              )}
+            </span>
           </button>
           <button 
             onClick={() => setTab('bookings')} 
@@ -325,6 +342,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     <label className="text-sm font-semibold">คนแทน (ถ้ามี)</label>
                     {staffList.length > 0 && (
                       <select
+                        defaultValue=""
                         onChange={e => {
                           const u = staffList.find(x => x.id === e.target.value)
                           setReqReplacementName(u?.name || u?.email || '')
@@ -332,10 +350,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                         }}
                         className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 mb-2"
                       >
-                        <option value="">เลือกจากรายชื่อ{getAuthUser()?.role === 'Pilot' ? 'นักบิน' : 'ช่างซ่อม'}ในระบบ</option>
+                        <option value="" disabled>กรุณาเลือกคนแทน</option>
                         {staffList.map(u => (
                           <option key={u.id} value={u.id}>
-                            {(u.name || u.email)}{u.phone ? ` • ${u.phone}` : ''}
+                            {u.name || 'ไม่ระบุชื่อ'}
                           </option>
                         ))}
                       </select>
@@ -425,11 +443,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       <span className={[
                         'px-2 py-1 rounded-lg text-[10px] font-black uppercase',
                         r.status === 'pending_admin' ? 'bg-amber-100 text-amber-700' :
+                        r.status === 'acknowledged' ? 'bg-blue-100 text-blue-700' :
                         r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
                         r.status === 'rejected' ? 'bg-red-100 text-red-700' :
                         'bg-slate-200 text-slate-700'
                       ].join(' ')}>
-                        {r.status === 'pending_admin' ? 'รอแอดมิน' : r.status === 'approved' ? 'อนุมัติ' : r.status === 'rejected' ? 'ไม่อนุมัติ' : 'ยกเลิก'}
+                        {r.status === 'pending_admin' ? 'รอแอดมิน' : r.status === 'acknowledged' ? 'รับทราบแล้ว' : r.status === 'approved' ? 'อนุมัติ' : r.status === 'rejected' ? 'ไม่อนุมัติ' : 'ยกเลิก'}
                       </span>
 
                       {isAdmin && r.status === 'pending_admin' && (
@@ -504,26 +523,72 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               <div className="text-2xl font-bold text-emerald-600">฿{stats.estRevenue.toLocaleString()}</div>
             </div>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-6">
             <div className="glass p-6">
-              <h3 className="font-bold mb-4">คอร์สยอดนิยม (จอง Active)</h3>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="font-bold">แจ้งจากทีมงาน</h3>
+                <div className="text-[10px] font-bold text-slate-400 uppercase">รอรับทราบ {pendingCount}</div>
+              </div>
               <div className="grid gap-3">
-                {stats.popularCourses.map((c, i) => (
-                  <div key={c.name} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-                    <div className="flex items-center gap-3">
-                      <span className="size-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 grid place-items-center text-xs font-bold">{i+1}</span>
-                      <span className="font-medium">{c.name}</span>
-                    </div>
-                    <div className="font-bold">{c.count} จอง</div>
-                  </div>
-                ))}
+                {pendingCount > 0 ? (
+                  pendingRequests.slice(0, 3).map(r => {
+                    const who = userById[r.created_by]
+                    const whoLabel = who?.name || who?.email || 'ไม่ทราบผู้ส่ง'
+                    return (
+                      <div key={r.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-semibold truncate">{whoLabel}</div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {TIME_SLOTS[r.slot]}
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-300 mt-2 line-clamp-2">{r.note}</div>
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-2">
+                            <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-red-100 text-red-700">ใหม่</span>
+                            <button
+                              onClick={async () => {
+                                const res = await updateReplacementRequestStatus(r.id, 'acknowledged')
+                                if (!res.ok) {
+                                  alert(res.error)
+                                  return
+                                }
+                                setTick(t => t + 1)
+                              }}
+                              className="btn btn-outline py-1.5 text-xs"
+                            >
+                              รับทราบ
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-sm text-slate-500">ยังไม่มีรายการรออนุมัติ</div>
+                )}
               </div>
             </div>
             <div className="glass p-6 flex flex-col justify-center items-center text-center">
               <div className="text-4xl mb-3">👨‍✈️</div>
               <h3 className="font-bold">โรงเรียนการบินพร้อมให้บริการ</h3>
               <p className="text-sm text-slate-500 mt-1">ระบบทำงานปกติ ตรวจสอบตารางบินล่าสุดได้เสมอ</p>
+            </div>
+          </div>
+          
+          <div className="glass p-6">
+            <h3 className="font-bold mb-4">คอร์สยอดนิยม (จอง Active)</h3>
+            <div className="grid gap-3">
+              {stats.popularCourses.map((c, i) => (
+                <div key={c.name} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex items-center gap-3">
+                    <span className="size-6 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 grid place-items-center text-xs font-bold">{i+1}</span>
+                    <span className="font-medium">{c.name}</span>
+                  </div>
+                  <div className="font-bold">{c.count} จอง</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

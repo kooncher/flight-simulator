@@ -388,7 +388,7 @@ export type SimulatorStatus = {
   updated_by?: string | null
 }
 
-export type ReplacementRequestStatus = 'pending_admin' | 'approved' | 'rejected' | 'cancelled'
+export type ReplacementRequestStatus = 'pending_admin' | 'acknowledged' | 'approved' | 'rejected' | 'cancelled'
 
 export type ReplacementRequest = {
   id: string
