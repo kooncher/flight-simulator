@@ -84,7 +84,7 @@ export default function Header({ loggedIn, onLogout, userName }: Props) {
             aria-label={dark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
             title={dark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
           >
-            {dark ? <BulbOffIcon /> : <BulbOnIcon />}
+            {dark ? <BulbOnIcon /> : <BulbOffIcon />}
           </button>
         </div>
       </div>
