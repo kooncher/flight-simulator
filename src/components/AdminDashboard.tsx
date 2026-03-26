@@ -772,10 +772,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
 
           {/* Mobile View (Cards) */}
           <div className="grid lg:hidden gap-4">
-            {bookings.filter(b => b.instructorId === me?.id).length === 0 ? (
-              <div className="glass p-8 text-center text-slate-400">คุณยังไม่ได้รับงานสอนใดๆ</div>
+            {bookings.length === 0 ? (
+              <div className="glass p-8 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</div>
             ) : (
-              bookings.filter(b => b.instructorId === me?.id).map(b => {
+              bookings.map(b => {
                 const isClaimedByMe = b.instructorId === me?.id
                 const isClaimed = !!b.instructorId
                 const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
