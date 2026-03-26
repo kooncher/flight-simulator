@@ -661,16 +661,20 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {b.status === 'pending' && (
                       <div className="mt-2">
                         {!isClaimed ? (
-                          <button 
-                            onClick={async () => {
-                              if (!me?.id) return
-                              const res = await claimBooking(b.id, me.id)
-                              if (res.ok) setTick(t => t+1)
-                            }}
-                            className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition"
-                          >
-                            รับงานสอนนี้
-                          </button>
+                          me?.role === 'Technician' ? (
+                            <div className="text-[10px] text-amber-600 font-medium italic">รอนักบินรับงานสอน...</div>
+                          ) : (
+                            <button 
+                              onClick={async () => {
+                                if (!me?.id) return
+                                const res = await claimBooking(b.id, me.id)
+                                if (res.ok) setTick(t => t+1)
+                              }}
+                              className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition"
+                            >
+                              รับงานสอนนี้
+                            </button>
+                          )
                         ) : (
                           <div className="grid gap-2">
                             <div className="flex items-center gap-2">
