@@ -260,7 +260,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     const note = status?.note || ''
 
                     return (
-                      <div key={b.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                      <div key={b.id} className={['p-4 rounded-xl border transition-all', !isReady ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50'].join(' ')}>
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <div className="font-bold">{new Date(b.date).toLocaleDateString('th-TH')} • {TIME_SLOTS[b.slot]}</div>
@@ -278,26 +278,26 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                                 await setSimulatorStatus(b.id, true, '')
                                 setTick(t => t+1)
                               }}
-                              className={['btn py-1.5 text-xs flex-1', isReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                              className={['btn py-1.5 text-xs flex-1', isReady ? 'btn-primary' : 'btn-outline bg-white dark:bg-slate-800'].join(' ')}
                             >
                               พร้อม
                             </button>
                             <button
                               onClick={async () => {
-                                const reason = prompt('ระบุเหตุผลที่ไม่พร้อม:')
+                                const reason = prompt('ระบุเหตุผลที่ไม่พร้อม (ระบบจะแสดงให้นักบินเห็น):')
                                 if (reason === null) return
                                 if (!reason.trim()) { alert('ต้องระบุเหตุผล'); return }
                                 await setSimulatorStatus(b.id, false, reason)
                                 setTick(t => t+1)
                               }}
-                              className={['btn py-1.5 text-xs flex-1', !isReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                              className={['btn py-1.5 text-xs flex-1', !isReady ? 'btn-primary bg-red-600 hover:bg-red-700 border-red-600 text-white' : 'btn-outline bg-white dark:bg-slate-800 hover:text-red-600 hover:border-red-200'].join(' ')}
                             >
                               ไม่พร้อม
                             </button>
                           </div>
                           {!isReady && note && (
-                            <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-1">
-                              เหตุผล: {note}
+                            <div className="text-xs text-red-700 bg-white/60 dark:bg-black/20 p-2.5 rounded-lg mt-1 font-medium border border-red-100 dark:border-red-900/30">
+                              <span className="font-bold">หมายเหตุจากช่าง:</span> {note}
                             </div>
                           )}
                         </div>
@@ -672,20 +672,29 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                             รับงานสอนนี้
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
-                              ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
-                            </span>
-                            {(isClaimedByMe || isAdmin) && (
-                              <button 
-                                onClick={async () => {
-                                  const res = await unclaimBooking(b.id)
-                                  if (res.ok) setTick(t => t+1)
-                                }}
-                                className="text-[10px] text-red-500 hover:underline"
-                              >
-                                ยกเลิกรับงาน
-                              </button>
+                          <div className="grid gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
+                                ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
+                              </span>
+                              {(isClaimedByMe || isAdmin) && (
+                                <button 
+                                  onClick={async () => {
+                                    const res = await unclaimBooking(b.id)
+                                    if (res.ok) setTick(t => t+1)
+                                  }}
+                                  className="text-[10px] text-red-500 hover:underline"
+                                >
+                                  ยกเลิกรับงาน
+                                </button>
+                              )}
+                            </div>
+                            {/* แสดงสถานะเครื่องที่ช่างอัปเดตให้นักบินเห็น */}
+                            {simStatuses[b.id] && (
+                              <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                                <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
+                                {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}
+                              </div>
                             )}
                           </div>
                         )}
