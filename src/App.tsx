@@ -281,16 +281,16 @@ export default function App() {
       )}
 
       {isAdmin && (
-        <section className="glass p-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-brand-600">Admin Dashboard</h1>
-          <p className="text-slate-500 mt-1">จัดการระบบโรงเรียนการบิน</p>
+        <section className="glass p-6 min-w-0 overflow-hidden">
+          <h1 className="text-2xl md:text-3xl font-bold text-brand-600 truncate">Admin Dashboard</h1>
+          <p className="text-slate-500 mt-1 truncate">จัดการระบบโรงเรียนการบิน</p>
         </section>
       )}
 
       {view === 'staff' && (isTechnician || isPilot) && (
-        <section className="glass p-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-brand-600">{isTechnician ? 'Technician Panel' : 'Pilot Panel'}</h1>
-          <p className="text-slate-500 mt-1">ควบคุมการปฏิบัติการและความพร้อมของ Flight Simulator</p>
+        <section className="glass p-6 min-w-0 overflow-hidden">
+          <h1 className="text-2xl md:text-3xl font-bold text-brand-600 truncate">{isTechnician ? 'Technician Panel' : 'Pilot Panel'}</h1>
+          <p className="text-slate-500 mt-1 truncate">ควบคุมการปฏิบัติการและความพร้อมของ Flight Simulator</p>
         </section>
       )}
 
