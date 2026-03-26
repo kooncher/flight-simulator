@@ -520,29 +520,29 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       {tab === 'overview' && (
         <div className="grid gap-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass p-6">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">จองวันนี้ (Active)</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">จองวันนี้ (Active)</div>
               <div className="text-3xl font-bold text-brand-600">{stats.todayCount}</div>
             </div>
-            <div className="glass p-6">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">จองสะสม (ไม่รวมยกเลิก)</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">จองสะสม (ไม่รวมยกเลิก)</div>
               <div className="text-3xl font-bold">{stats.totalCount}</div>
             </div>
-            <div className="glass p-6">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">นักเรียนทั้งหมด</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">นักเรียนทั้งหมด</div>
               <div className="text-3xl font-bold">{stats.userCount}</div>
             </div>
-            <div className="glass p-6">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">รายได้จริง (Completed)</div>
-              <div className="text-2xl font-bold text-emerald-600">฿{stats.estRevenue.toLocaleString()}</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">รายได้จริง (Completed)</div>
+              <div className="text-2xl sm:text-3xl font-bold text-emerald-600 truncate">฿{stats.estRevenue.toLocaleString()}</div>
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="glass p-6">
+            <div className="glass p-4 sm:p-6 overflow-hidden">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 className="font-bold">แจ้งจากทีมงาน</h3>
-                <div className="text-[10px] font-bold text-slate-400 uppercase">รอรับทราบ {pendingCount}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase shrink-0">รอรับทราบ {pendingCount}</div>
               </div>
               <div className="grid gap-3">
                 {pendingCount > 0 ? (
@@ -608,14 +608,14 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 </div>
               )}
             </div>
-            <div className="glass p-6 flex flex-col justify-center items-center text-center">
+            <div className="glass p-4 sm:p-6 flex flex-col justify-center items-center text-center overflow-hidden">
               <div className="text-4xl mb-3">👨‍✈️</div>
               <h3 className="font-bold">โรงเรียนการบินพร้อมให้บริการ</h3>
               <p className="text-sm text-slate-500 mt-1">ระบบทำงานปกติ ตรวจสอบตารางบินล่าสุดได้เสมอ</p>
             </div>
           </div>
           
-          <div className="glass p-6">
+          <div className="glass p-4 sm:p-6 overflow-hidden">
             <h3 className="font-bold mb-4">คอร์สยอดนิยม (จอง Active)</h3>
             <div className="grid gap-3">
               {stats.popularCourses.map((c, i) => (
