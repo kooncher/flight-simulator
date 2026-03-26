@@ -11,7 +11,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   const isAdmin = me?.role === 'Admin'
   const isTechnician = me?.role === 'Technician'
 
-  const [tab, setTab] = useState<'ops' | 'overview' | 'bookings' | 'users' | 'calendar' | 'courses' | 'announcements'>(() => {
+  const [tab, setTab] = useState<'ops' | 'overview' | 'bookings' | 'users' | 'calendar' | 'courses' | 'announcements' | 'my-tasks'>(() => {
     if (mode === 'admin') return 'overview'
     if (isTechnician) return 'ops'
     return 'bookings'
@@ -192,8 +192,16 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
             onClick={() => setTab('bookings')} 
             className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
           >
-            รายการจอง
+            รายการจอง (ทั้งหมด)
           </button>
+          {me?.role === 'Pilot' && (
+            <button 
+              onClick={() => setTab('my-tasks')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'my-tasks' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            >
+              งานสอนของฉัน
+            </button>
+          )}
           {mode === 'admin' && (
             <>
           <button 
@@ -752,6 +760,117 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               {bookings.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 sm:px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'my-tasks' && (
+        <div className="glass overflow-x-auto">
+          <table className="w-full min-w-[920px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">วันที่ / เวลา</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">นักเรียน</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4">คอร์ส / สถานะ</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">ติดต่อ</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {bookings.filter(b => b.instructorId === me?.id).map(b => {
+                const instructorUser = users.find(u => u.id === b.instructorId)
+                
+                return (
+                <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                    <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                    <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
+                  </td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
+                    <div className="font-medium">{b.name}</div>
+                    <div className="text-xs text-slate-400 truncate max-w-[320px]">{b.email}</div>
+                    {b.note && (
+                      <div className="mt-1 text-[10px] text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-1.5 py-0.5 rounded italic">
+                        Note: {b.note}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
+                    <div className="mb-2">
+                      <span className="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-xs font-medium">
+                        {courseMap[b.courseId] || b.courseId}
+                      </span>
+                    </div>
+                    {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
+                    {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
+                    {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
+                    
+                    {b.status === 'pending' && (
+                      <div className="mt-2">
+                        <div className="grid gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-brand-100 text-brand-700">
+                              ผู้สอน: {instructorUser?.name || 'คุณ'} (คุณ)
+                            </span>
+                            <button 
+                              onClick={async () => {
+                                const res = await unclaimBooking(b.id)
+                                if (res.ok) setTick(t => t+1)
+                              }}
+                              className="text-[10px] text-red-500 hover:underline"
+                            >
+                              ยกเลิกรับงาน
+                            </button>
+                          </div>
+                          {simStatuses[b.id] && (
+                            <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                              <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
+                              {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-slate-500 text-xs whitespace-nowrap">
+                    {b.phone}
+                  </td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
+                    <div className="flex flex-col gap-1">
+                      {b.status === 'pending' && (
+                        <>
+                          <button 
+                            onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
+                            className="text-xs font-bold text-left text-emerald-500 hover:text-emerald-600"
+                          >
+                            Mark Completed
+                          </button>
+                          <button 
+                            onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
+                            className="text-xs font-bold text-left text-red-500 hover:text-red-600"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {b.status !== 'pending' && (
+                        <button 
+                          onClick={async () => { await updateBookingStatus(b.id, 'pending'); setTick(t => t+1) }}
+                          className="text-slate-400 hover:text-slate-600 text-xs font-medium text-left"
+                        >
+                          Revert to Pending
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )})}
+              {bookings.filter(b => b.instructorId === me?.id).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 sm:px-6 py-12 text-center text-slate-400">คุณยังไม่ได้รับงานสอนใดๆ</td>
                 </tr>
               )}
             </tbody>
