@@ -680,9 +680,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       {b.status === 'pending' && (
                         <div className="mt-2">
                           {!isClaimed ? (
-                            me?.role === 'Technician' ? (
-                              <div className="text-[10px] text-amber-600 font-medium italic">รอนักบินรับงานสอน...</div>
-                            ) : (
+                            me?.role === 'Pilot' ? (
                               <button 
                                 onClick={async () => {
                                   if (!me?.id) return
@@ -693,6 +691,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                               >
                                 รับงานสอนนี้
                               </button>
+                            ) : me?.role === 'Technician' ? (
+                              <div className="text-[10px] text-amber-600 font-medium italic">รอนักบินรับงานสอน...</div>
+                            ) : (
+                              <div className="text-[10px] text-slate-500 font-medium italic">แอดมินรับงานสอนไม่ได้ (ให้นักบินรับงาน)</div>
                             )
                           ) : (
                             <div className="grid gap-2">
@@ -816,9 +818,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {b.status === 'pending' && (
                       <div className="flex flex-col gap-2">
                         {!isClaimed ? (
-                          me?.role === 'Technician' ? (
-                            <div className="text-xs text-amber-600 font-medium italic text-center py-2 bg-amber-50 dark:bg-amber-900/10 rounded-xl">รอนักบินรับงานสอน...</div>
-                          ) : (
+                          me?.role === 'Pilot' ? (
                             <button 
                               onClick={async () => {
                                 if (!me?.id) return
@@ -829,6 +829,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                             >
                               รับงานสอนนี้
                             </button>
+                          ) : me?.role === 'Technician' ? (
+                            <div className="text-xs text-amber-600 font-medium italic text-center py-2 bg-amber-50 dark:bg-amber-900/10 rounded-xl">รอนักบินรับงานสอน...</div>
+                          ) : (
+                            <div className="text-xs text-slate-500 font-medium italic text-center py-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl">แอดมินรับงานสอนไม่ได้ (ให้นักบินรับงาน)</div>
                           )
                         ) : (
                           <div className="grid gap-2">

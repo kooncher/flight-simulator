@@ -119,8 +119,21 @@ export async function updateBookingStatus(id: string, status: 'pending' | 'compl
 }
 
 export async function claimBooking(id: string, instructorId: string) {
-  const { error } = await supabase.from('bookings').update({ instructor_id: instructorId }).eq('id', id)
+  const me = getAuthUser()
+  if (!me?.id) return { ok: false, error: 'กรุณาเข้าสู่ระบบ' }
+  if (me.role !== 'Pilot') return { ok: false, error: 'เฉพาะนักบินเท่านั้นที่รับงานสอนได้' }
+  if (me.id !== instructorId) return { ok: false, error: 'ไม่สามารถรับงานแทนผู้อื่นได้' }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ instructor_id: instructorId })
+    .eq('id', id)
+    .eq('status', 'pending')
+    .is('instructor_id', null)
+    .select('id')
+
   if (error) return { ok: false, error: error.message }
+  if (!data || data.length === 0) return { ok: false, error: 'รับงานไม่สำเร็จ (อาจมีคนรับงานไปแล้ว หรือรายการไม่อยู่ในสถานะรอดำเนินการ)' }
   return { ok: true }
 }
 
