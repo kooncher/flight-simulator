@@ -35,6 +35,11 @@ export default function AppLayout({ children, userEmail, userName, onLogout, q, 
             <button onClick={() => setSidebarOpen(true)} className="btn btn-outline">เมนู</button>
           </div>
         )}
+        {(userRole === 'Pilot' || userRole === 'Technician') && !isAdminView && (
+           <div className="flex items-center justify-between gap-3 lg:hidden mb-4">
+             <button onClick={() => setSidebarOpen(true)} className="btn btn-outline">เมนู</button>
+           </div>
+        )}
 
         {!isAdminView && sidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
@@ -67,7 +72,7 @@ export default function AppLayout({ children, userEmail, userName, onLogout, q, 
             </div>
           </div>
         )}
-        <div className={isAdminView ? 'grid gap-6' : 'grid lg:grid-cols-[280px_1fr] gap-6 items-start'}>
+        <div className={isAdminView ? 'grid gap-6 min-w-0' : 'grid lg:grid-cols-[280px_1fr] gap-6 items-start min-w-0'}>
           {!isAdminView && (
             <div className="hidden lg:block">
               <Sidebar
@@ -83,7 +88,7 @@ export default function AppLayout({ children, userEmail, userName, onLogout, q, 
               />
             </div>
           )}
-          <div className="grid gap-6">
+          <div className="grid gap-6 min-w-0">
             {children}
           </div>
         </div>
