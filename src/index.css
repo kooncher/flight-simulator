@@ -6,6 +6,11 @@
   color-scheme: light dark;
 }
 
+body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 .glass {
   @apply bg-white/70 dark:bg-slate-900/50 backdrop-blur-md border border-white/20 dark:border-slate-700/50 rounded-2xl shadow-lg;
 }

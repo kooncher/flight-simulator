@@ -27,9 +27,9 @@ export default function AppLayout({ children, userEmail, userName, onLogout, q, 
     if (isAdminView) setSidebarOpen(false)
   }, [isAdminView])
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-950">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 overflow-x-hidden">
       <Header loggedIn onLogout={onLogout} userName={userName} />
-      <main className="max-w-7xl mx-auto px-4 py-8 grid gap-6">
+      <main className="w-full max-w-7xl mx-auto px-4 py-8 grid gap-6">
         {!isAdminView && (
           <div className="flex items-center justify-between gap-3 lg:hidden">
             <button onClick={() => setSidebarOpen(true)} className="btn btn-outline">เมนู</button>
