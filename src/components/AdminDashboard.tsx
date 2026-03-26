@@ -328,6 +328,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     <input
                       type="date"
                       value={reqDate}
+                      min={new Date().toISOString().slice(0, 10)}
                       onChange={e => setReqDate(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                     />
