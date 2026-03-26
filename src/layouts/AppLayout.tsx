@@ -35,11 +35,6 @@ export default function AppLayout({ children, userEmail, userName, onLogout, q, 
             <button onClick={() => setSidebarOpen(true)} className="btn btn-outline">เมนู</button>
           </div>
         )}
-        {(userRole === 'Pilot' || userRole === 'Technician') && !isAdminView && (
-           <div className="flex items-center justify-between gap-3 lg:hidden mb-4">
-             <button onClick={() => setSidebarOpen(true)} className="btn btn-outline">เมนู</button>
-           </div>
-        )}
 
         {!isAdminView && sidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
