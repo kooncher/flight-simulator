@@ -771,7 +771,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           </div>
 
           {/* Mobile View (Cards) */}
-          <div className="grid lg:hidden gap-4">
+          <div className="grid lg:hidden gap-4 overflow-hidden">
             {bookings.length === 0 ? (
               <div className="glass p-8 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</div>
             ) : (
@@ -781,7 +781,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
                 
                 return (
-                  <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                  <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4 overflow-hidden', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
                     {/* Header: Date & Status */}
                     <div className="flex justify-between items-start">
                       <div>
@@ -1016,7 +1016,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           </div>
 
           {/* Mobile View (Cards) */}
-          <div className="grid lg:hidden gap-4">
+          <div className="grid lg:hidden gap-4 overflow-hidden">
             {bookings.filter(b => b.instructorId === me?.id).length === 0 ? (
               <div className="glass p-8 text-center text-slate-400">คุณยังไม่ได้รับงานสอนใดๆ</div>
             ) : (
@@ -1024,7 +1024,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 const instructorUser = users.find(u => u.id === b.instructorId)
                 
                 return (
-                  <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                  <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4 overflow-hidden', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
                     {/* Header: Date & Status */}
                     <div className="flex justify-between items-start">
                       <div>
