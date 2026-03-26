@@ -263,9 +263,9 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       </div>
       {tab === 'ops' && (
         <div className="grid gap-6">
-          <div className="glass p-6">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-              <div className="flex-1">
+          <div className="glass p-4 sm:p-6 overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+              <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold">สถานะอุปกรณ์ (ตามรายการสอน)</h2>
                 <div className="text-sm text-slate-500 mt-1">ช่างเทคนิคต้องระบุความพร้อมของอุปกรณ์สำหรับคิวที่มีนักบินรับงานแล้ว</div>
 
@@ -277,13 +277,13 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     const note = status?.note || ''
 
                     return (
-                      <div key={b.id} className={['p-4 rounded-xl border transition-all', !isReady ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50'].join(' ')}>
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="font-bold">{new Date(b.date).toLocaleDateString('th-TH')} • {TIME_SLOTS[b.slot]}</div>
-                            <div className="text-sm text-slate-500">นักเรียน: {b.name} | ผู้สอน: {instructor?.name || 'ไม่ระบุ'}</div>
+                      <div key={b.id} className={['p-3 sm:p-4 rounded-xl border transition-all', !isReady ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50'].join(' ')}>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
+                          <div className="min-w-0">
+                            <div className="font-bold text-sm sm:text-base">{new Date(b.date).toLocaleDateString('th-TH')} • {TIME_SLOTS[b.slot]}</div>
+                            <div className="text-xs sm:text-sm text-slate-500 truncate">นักเรียน: {b.name} | ผู้สอน: {instructor?.name || 'ไม่ระบุ'}</div>
                           </div>
-                          <span className={['px-2 py-1 rounded-lg text-[10px] font-bold uppercase', isReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
+                          <span className={['self-start px-2 py-1 rounded-lg text-[10px] font-bold uppercase shrink-0', isReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
                             {isReady ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
                           </span>
                         </div>
@@ -327,7 +327,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 </div>
               </div>
 
-              <div className="w-full md:w-[420px] rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-5">
+              <div className="w-full lg:w-[420px] rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4 sm:p-5">
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">แจ้งแอดมิน / หาแทน</div>
                 <div className="grid gap-3">
                   <div className="grid gap-1">
