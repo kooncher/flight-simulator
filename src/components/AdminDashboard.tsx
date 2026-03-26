@@ -776,7 +776,9 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               <div className="glass p-8 text-center text-slate-400">คุณยังไม่ได้รับงานสอนใดๆ</div>
             ) : (
               bookings.filter(b => b.instructorId === me?.id).map(b => {
-                const instructorUser = users.find(u => u.id === b.instructorId)
+                const isClaimedByMe = b.instructorId === me?.id
+                const isClaimed = !!b.instructorId
+                const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
                 
                 return (
                   <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
@@ -813,35 +815,54 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {/* Instructor & Sim Status (if pending) */}
                     {b.status === 'pending' && (
                       <div className="flex flex-col gap-2">
-                        <div className="grid gap-2">
-                          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <span className="text-xs font-bold text-brand-600">
-                              ผู้สอน: {instructorUser?.name || 'คุณ'} (คุณ)
-                            </span>
+                        {!isClaimed ? (
+                          me?.role === 'Technician' ? (
+                            <div className="text-xs text-amber-600 font-medium italic text-center py-2 bg-amber-50 dark:bg-amber-900/10 rounded-xl">รอนักบินรับงานสอน...</div>
+                          ) : (
                             <button 
                               onClick={async () => {
-                                const res = await unclaimBooking(b.id)
+                                if (!me?.id) return
+                                const res = await claimBooking(b.id, me.id)
                                 if (res.ok) setTick(t => t+1)
                               }}
-                              className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg"
+                              className="w-full py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl transition"
                             >
-                              ยกเลิกรับงาน
+                              รับงานสอนนี้
                             </button>
-                          </div>
-                          
-                          {/* แสดงสถานะเครื่อง */}
-                          {simStatuses[b.id] && (
-                            <div className={['p-2.5 rounded-xl text-xs border flex flex-col gap-1', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
-                              <div className="font-bold flex items-center gap-1">
-                                <span className="size-2 rounded-full bg-current"></span>
-                                สถานะอุปกรณ์: {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
-                              </div>
-                              {!simStatuses[b.id].ready && simStatuses[b.id].note && (
-                                <div className="pl-3 opacity-80 break-all">{simStatuses[b.id].note}</div>
+                          )
+                        ) : (
+                          <div className="grid gap-2">
+                            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <span className={['text-xs font-bold', isClaimedByMe ? 'text-brand-600' : 'text-slate-600'].join(' ')}>
+                                ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
+                              </span>
+                              {(isClaimedByMe || isAdmin) && (
+                                <button 
+                                  onClick={async () => {
+                                    const res = await unclaimBooking(b.id)
+                                    if (res.ok) setTick(t => t+1)
+                                  }}
+                                  className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg"
+                                >
+                                  ยกเลิกรับงาน
+                                </button>
                               )}
                             </div>
-                          )}
-                        </div>
+                            
+                            {/* แสดงสถานะเครื่อง */}
+                            {simStatuses[b.id] && (
+                              <div className={['p-2.5 rounded-xl text-xs border flex flex-col gap-1', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                                <div className="font-bold flex items-center gap-1">
+                                  <span className="size-2 rounded-full bg-current"></span>
+                                  สถานะอุปกรณ์: {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
+                                </div>
+                                {!simStatuses[b.id].ready && simStatuses[b.id].note && (
+                                  <div className="pl-3 opacity-80 break-all">{simStatuses[b.id].note}</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -850,12 +871,14 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       {b.status === 'pending' && (
                         <>
                           <button 
+                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
-                            className="flex-1 py-2 rounded-xl text-xs font-bold transition-colors bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                            className={['flex-1 py-2 rounded-xl text-xs font-bold transition-colors', (!isClaimedByMe && !isAdmin) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'].join(' ')}
                           >
                             Mark Completed
                           </button>
                           <button 
+                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
                             className="px-4 py-2 rounded-xl text-xs font-bold transition-colors bg-red-50 text-red-600 hover:bg-red-100"
                           >
