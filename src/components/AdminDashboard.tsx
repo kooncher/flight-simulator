@@ -182,6 +182,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               </span>
             </button>
           )}
+          <button 
+            onClick={() => setTab('bookings')} 
+            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+          >
+            รายการจอง
+          </button>
           {mode === 'admin' && (
             <>
           <button 
@@ -196,12 +202,6 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 </span>
               )}
             </span>
-          </button>
-          <button 
-            onClick={() => setTab('bookings')} 
-            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            รายการจอง
           </button>
           <button 
             onClick={() => setTab('users')} 

@@ -73,6 +73,7 @@ CREATE POLICY "Allow admin all announcements" ON announcements FOR ALL USING (au
 CREATE POLICY "Allow users to read own bookings" ON bookings FOR SELECT USING (auth.uid() = user_id OR auth.jwt() ->> 'email' = 'admin@flight.com');
 CREATE POLICY "Allow users to insert own bookings" ON bookings FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Allow users to update own bookings" ON bookings FOR UPDATE USING (auth.uid() = user_id OR auth.jwt() ->> 'email' = 'admin@flight.com');
+CREATE POLICY "Allow staff update bookings" ON bookings FOR UPDATE USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role IN ('Admin', 'Technician', 'Pilot')));
 
 -- Policies for Blocked Slots (Public read, Admin write)
 CREATE POLICY "Allow public read blocked_slots" ON blocked_slots FOR SELECT USING (true);
