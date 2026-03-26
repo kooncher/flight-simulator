@@ -694,7 +694,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                           )
                         ) : (
                           <div className="grid gap-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
                                 ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
                               </span>
@@ -712,9 +712,9 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                             </div>
                             {/* แสดงสถานะเครื่องที่ช่างอัปเดตให้นักบินเห็น */}
                             {simStatuses[b.id] && (
-                              <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                              <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex flex-wrap items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
                                 <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
-                                {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}
+                                <span className="break-all">{simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}</span>
                               </div>
                             )}
                           </div>
@@ -813,7 +813,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {b.status === 'pending' && (
                       <div className="mt-2">
                         <div className="grid gap-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-brand-100 text-brand-700">
                               ผู้สอน: {instructorUser?.name || 'คุณ'} (คุณ)
                             </span>
@@ -828,9 +828,9 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                             </button>
                           </div>
                           {simStatuses[b.id] && (
-                            <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                            <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex flex-wrap items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
                               <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
-                              {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}
+                              <span className="break-all">{simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}</span>
                             </div>
                           )}
                         </div>
