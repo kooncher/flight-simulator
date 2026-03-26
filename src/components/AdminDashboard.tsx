@@ -968,8 +968,13 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
 
        {tab === 'calendar' && (
         <div className="glass p-6">
-          <h2 className="text-xl font-bold mb-4">จัดการช่วงเวลาว่าง (Block Slots)</h2>
-          <p className="text-sm text-slate-500 mb-6">เลือกวันที่และคลิกที่ช่วงเวลาเพื่อ "เปิด/ปิด" การจอง (เช่น กรณีเครื่องบินซ่อมบำรุง หรือวันหยุดครู)</p>
+          <h2 className="text-xl font-bold mb-4">ตารางบิน (Calendar)</h2>
+          {isAdmin && (
+            <p className="text-sm text-slate-500 mb-6">เลือกวันที่และคลิกที่ช่วงเวลาเพื่อ "เปิด/ปิด" การจอง (เช่น กรณีเครื่องบินซ่อมบำรุง หรือวันหยุดครู)</p>
+          )}
+          {!isAdmin && (
+            <p className="text-sm text-slate-500 mb-6">เลือกวันที่เพื่อดูว่าช่วงเวลาไหนมีคนจองแล้วบ้าง หรือถูกปิดการจองโดยแอดมิน</p>
+          )}
           
           <div className="grid md:grid-cols-[300px_1fr] gap-8">
             <div>
@@ -986,18 +991,24 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               {TIME_SLOTS.map((slot, i) => {
                 const isBlocked = (blockedMap[blockDate] || []).includes(i)
                 const isTaken = bookings.some(b => b.date === blockDate && b.slot === i)
+                const disabled = isTaken || !isAdmin
                 
                 return (
                   <button
                     key={slot}
-                    disabled={isTaken}
-                    onClick={async () => { await toggleBlockSlot(blockDate, i); setTick(t => t+1) }}
+                    disabled={disabled}
+                    onClick={async () => { 
+                      if (!isAdmin) return;
+                      await toggleBlockSlot(blockDate, i); 
+                      setTick(t => t+1) 
+                    }}
                     className={[
                       'p-6 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-32',
                       isBlocked 
                         ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/30 dark:bg-red-900/10' 
                         : 'border-slate-100 bg-white hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900',
-                      isTaken ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                      isTaken ? 'opacity-50 cursor-not-allowed grayscale' : '',
+                      !isAdmin && !isTaken ? 'cursor-default hover:border-slate-100 dark:hover:border-slate-800' : ''
                     ].join(' ')}
                   >
                     <div>
