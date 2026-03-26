@@ -177,7 +177,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   return (
     <div className="grid gap-6">
       <div className="grid gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden">
           <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto whitespace-nowrap scrollbar-hide w-full sm:w-auto">
             {mode === 'staff' && me?.role === 'Technician' && (
               <button
@@ -251,7 +251,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               </>
             )}
           </div>
-          <div className="flex items-center sm:justify-end">
+          <div className="flex items-center sm:justify-end shrink-0">
             <button 
               onClick={() => setTick(t => t+1)}
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700"
@@ -1126,23 +1126,23 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       )}
 
       {tab === 'users' && (
-        <div className="grid md:grid-cols-[1fr_1.5fr] gap-6">
-          <div className="glass overflow-hidden h-fit">
+        <div className="grid lg:grid-cols-[1fr_1.5fr] gap-4 sm:gap-6 min-w-0">
+          <div className="glass overflow-hidden h-fit flex flex-col">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 font-semibold bg-slate-50/50 dark:bg-slate-900/50">นักเรียนทั้งหมด</div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[300px] lg:max-h-[600px] overflow-y-auto">
               {users.map(u => (
                 <button 
                   key={u.email} 
                   onClick={() => setSelectedUser(u)}
-                  className={['w-full text-left px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative', selectedUser?.email === u.email ? 'bg-brand-50 dark:bg-brand-900/10 border-r-4 border-brand-500' : ''].join(' ')}
+                  className={['w-full text-left px-4 sm:px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative', selectedUser?.email === u.email ? 'bg-brand-50 dark:bg-brand-900/10 border-r-4 border-brand-500' : ''].join(' ')}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-semibold">{u.name || 'ไม่ระบุชื่อ'}</div>
-                      <div className="text-xs text-slate-400">{u.email}</div>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{u.name || 'ไม่ระบุชื่อ'}</div>
+                      <div className="text-xs text-slate-400 truncate">{u.email}</div>
                     </div>
                     <span className={[
-                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded',
+                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 mt-1',
                       u.role === 'Admin' ? 'bg-purple-100 text-purple-700' :
                       u.role === 'Technician' ? 'bg-blue-100 text-blue-700' :
                       u.role === 'Pilot' ? 'bg-emerald-100 text-emerald-700' :
@@ -1156,14 +1156,14 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
             </div>
           </div>
 
-          <div className="glass p-6">
+          <div className="glass p-4 sm:p-6 overflow-hidden">
             {selectedUser ? (
               <div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                  <div>
-                    <h2 className="text-2xl font-bold">{selectedUser.name || 'ไม่ระบุชื่อ'}</h2>
-                    <p className="text-slate-500">{selectedUser.email}</p>
-                    <p className="text-slate-500">{selectedUser.phone || 'ไม่มีเบอร์โทร'}</p>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-bold truncate">{selectedUser.name || 'ไม่ระบุชื่อ'}</h2>
+                    <p className="text-slate-500 truncate">{selectedUser.email}</p>
+                    <p className="text-slate-500 truncate">{selectedUser.phone || 'ไม่มีเบอร์โทร'}</p>
                   </div>
                   
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -1387,16 +1387,16 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
        )}
 
        {tab === 'calendar' && (
-        <div className="glass p-6">
+        <div className="glass p-4 sm:p-6 overflow-hidden">
           <h2 className="text-xl font-bold mb-4">ตารางบิน (Calendar)</h2>
           {isAdmin && (
-            <p className="text-sm text-slate-500 mb-6">เลือกวันที่และคลิกที่ช่วงเวลาเพื่อ "เปิด/ปิด" การจอง (เช่น กรณีเครื่องบินซ่อมบำรุง หรือวันหยุดครู)</p>
+            <p className="text-sm text-slate-500 mb-6 truncate">เลือกวันที่และคลิกที่ช่วงเวลาเพื่อ "เปิด/ปิด" การจอง (เช่น กรณีเครื่องบินซ่อมบำรุง หรือวันหยุดครู)</p>
           )}
           {!isAdmin && (
-            <p className="text-sm text-slate-500 mb-6">เลือกวันที่เพื่อดูว่าช่วงเวลาไหนมีคนจองแล้วบ้าง หรือถูกปิดการจองโดยแอดมิน</p>
+            <p className="text-sm text-slate-500 mb-6 truncate">เลือกวันที่เพื่อดูว่าช่วงเวลาไหนมีคนจองแล้วบ้าง หรือถูกปิดการจองโดยแอดมิน</p>
           )}
           
-          <div className="grid md:grid-cols-[300px_1fr] gap-8">
+          <div className="grid lg:grid-cols-[300px_1fr] gap-6 sm:gap-8">
             <div>
               <label className="text-sm font-semibold mb-2 block">เลือกวันที่</label>
               <input 
@@ -1450,9 +1450,9 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
        )}
 
        {tab === 'announcements' && (
-         <div className="grid gap-6">
-           <div className="glass p-6">
-             <h2 className="text-xl font-bold mb-6">สร้างประกาศใหม่</h2>
+          <div className="grid gap-6">
+            <div className="glass p-6">
+              <h2 className="text-xl font-bold mb-6">สร้างประกาศใหม่</h2>
              <div className="grid gap-4">
                <textarea 
                  placeholder="พิมพ์ข้อความประกาศที่นี่..."
