@@ -84,11 +84,12 @@ export default function MyBookings({ userEmail }: Props) {
             )}
             <div className="mt-1 flex gap-2 items-center">
               {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
+              {b.status === 'paid' && <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">จ่ายเงินแล้ว</span>} 
               {b.status === 'pending' && (
                 <>
                   {lessThan24h(b.date, b.slot)
                     ? <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">ใกล้ถึงเวลาเรียน</span>
-                    : <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 text-[10px] font-bold">รอเรียน</span>}
+                    : <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 text-[10px] font-bold">รอเรียน (หรือรอจ่ายเงิน)</span>}
                 </>
               )}
               {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}

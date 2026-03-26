@@ -21,7 +21,7 @@ export type Booking = {
   email: string
   phone: string
   slot: number
-  status: 'pending' | 'completed' | 'cancelled'
+  status: 'pending' | 'completed' | 'cancelled' | 'paid'
   note?: string
   instructorId?: string | null
 }
@@ -113,7 +113,7 @@ export async function getBookings(): Promise<Booking[]> {
   })) as Booking[]
 }
 
-export async function updateBookingStatus(id: string, status: 'pending' | 'completed' | 'cancelled') {
+export async function updateBookingStatus(id: string, status: 'pending' | 'completed' | 'cancelled' | 'paid') {
   const { error } = await supabase.from('bookings').update({ status }).eq('id', id)
   if (error) console.error('Error updating booking status:', error)
 }
