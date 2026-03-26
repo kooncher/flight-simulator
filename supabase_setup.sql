@@ -131,12 +131,16 @@ INSERT INTO courses (id, name, description, hours, price, image, badge, tags) VA
 -- 7. Flight Simulator Ops
 CREATE TABLE IF NOT EXISTS simulator_status (
   id TEXT PRIMARY KEY,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE CASCADE,
   ready BOOLEAN NOT NULL DEFAULT true,
   note TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   updated_by UUID REFERENCES auth.users(id)
 );
 
+ALTER TABLE simulator_status ADD COLUMN IF NOT EXISTS booking_id TEXT REFERENCES bookings(id) ON DELETE CASCADE;
+
+-- Insert default row only if not exists
 INSERT INTO simulator_status (id, ready, note)
 VALUES ('main', true, NULL)
 ON CONFLICT (id) DO NOTHING;

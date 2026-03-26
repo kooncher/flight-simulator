@@ -396,6 +396,7 @@ export async function migrateBookingsEmail(oldEmail: string, newEmail: string) {
 
 export type SimulatorStatus = {
   id: string
+  booking_id?: string | null
   ready: boolean
   note?: string | null
   updated_at?: string
@@ -420,24 +421,20 @@ export type ReplacementRequest = {
   updated_at?: string
 }
 
-export async function getSimulatorStatus(): Promise<SimulatorStatus | null> {
-  const { data, error } = await supabase.from('simulator_status').select('*').eq('id', 'main').maybeSingle()
-  if (!error && data) return data as SimulatorStatus
-  const { data: inserted } = await supabase
-    .from('simulator_status')
-    .insert({ id: 'main', ready: true, note: null })
-    .select()
-    .single()
-  return (inserted || null) as SimulatorStatus | null
+export async function getSimulatorStatus(bookingId: string): Promise<SimulatorStatus | null> {
+  const { data, error } = await supabase.from('simulator_status').select('*').eq('booking_id', bookingId).single()
+  if (error || !data) return null
+  return data as SimulatorStatus
 }
 
-export async function setSimulatorStatus(ready: boolean, note?: string) {
+export async function setSimulatorStatus(bookingId: string, ready: boolean, note?: string) {
   const user = getAuthUser()
   if (!user?.id) return { ok: false as const, error: 'กรุณาเข้าสู่ระบบ' }
   const { error } = await supabase
     .from('simulator_status')
     .upsert({
-      id: 'main',
+      id: bookingId,
+      booking_id: bookingId,
       ready,
       note: note ?? null,
       updated_by: user.id,

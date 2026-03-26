@@ -15,15 +15,11 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   const [courses, setCourses] = useState<Course[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [blockedMap, setBlockedMap] = useState<Record<string, number[]>>({})
+  const [simStatuses, setSimStatuses] = useState<Record<string, SimulatorStatus>>({})
   const [loading, setLoading] = useState(true)
 
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const [simStatus, setSimStatus] = useState<SimulatorStatus | null>(null)
-  const [simDraftReady, setSimDraftReady] = useState(true)
-  const [simDraftNote, setSimDraftNote] = useState('')
-  const [simSaving, setSimSaving] = useState(false)
 
   const [requests, setRequests] = useState<ReplacementRequest[]>([])
   const [reqDate, setReqDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -39,17 +35,15 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       setLoading(true)
       const bP = getBookings()
       const blP = getBlockedSlots()
-      const simP = getSimulatorStatus()
       const reqP = getReplacementRequests()
       const isAdminMode = mode === 'admin'
       const adminP: Promise<[User[], Course[], Announcement[]]> = isAdminMode
         ? Promise.all([getAllUsers(), getCourses(), getAnnouncements()])
         : Promise.resolve([[] as User[], [] as Course[], [] as Announcement[]])
 
-      const [b, bl, sim, req, [u, c, a]] = await Promise.all([bP, blP, simP, reqP, adminP])
+      const [b, bl, req, [u, c, a]] = await Promise.all([bP, blP, reqP, adminP])
       setBookings(b.sort((a, b) => b.date.localeCompare(a.date)))
       setBlockedMap(bl)
-      setSimStatus(sim)
       setRequests(req)
 
       if (isAdminMode) {
@@ -62,8 +56,15 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
         setAnnouncements([])
       }
 
-      setSimDraftReady(sim?.ready ?? true)
-      setSimDraftNote(sim?.note ? String(sim.note) : '')
+      // Load simulator statuses for claimed bookings
+      const claimedBookings = b.filter(x => x.instructorId)
+      const statuses: Record<string, SimulatorStatus> = {}
+      for (const cb of claimedBookings) {
+        const s = await getSimulatorStatus(cb.id)
+        if (s) statuses[cb.id] = s
+      }
+      setSimStatuses(statuses)
+
       const me = getAuthUser()
       const roleForReplacement: UserRole | null = me?.role === 'Pilot' ? 'Pilot' : (me?.role === 'Technician' ? 'Technician' : null)
       if (roleForReplacement) {
@@ -248,75 +249,64 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           <div className="glass p-6">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
               <div className="flex-1">
-                <h2 className="text-xl font-bold">สถานะ Flight Simulator</h2>
-                <div className="text-sm text-slate-500 mt-1">กรณีไม่พร้อม ให้แจ้งเหตุผล และสร้างคำขอหา/เปลี่ยนคนแทนเพื่อแจ้งแอดมินก่อน</div>
+                <h2 className="text-xl font-bold">สถานะอุปกรณ์ (ตามรายการสอน)</h2>
+                <div className="text-sm text-slate-500 mt-1">ช่างเทคนิคต้องระบุความพร้อมของอุปกรณ์สำหรับคิวที่มีนักบินรับงานแล้ว</div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className={['px-2 py-1 rounded-lg text-xs font-bold uppercase', simDraftReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
-                    {simDraftReady ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
-                  </span>
-                  {simStatus?.updated_at && (
-                    <span className="text-[10px] text-slate-400">
-                      อัปเดตล่าสุด: {new Date(simStatus.updated_at).toLocaleString('th-TH')}
-                    </span>
+                <div className="mt-6 grid gap-4">
+                  {bookings.filter(b => b.instructorId && b.status === 'pending').map(b => {
+                    const instructor = users.find(u => u.id === b.instructorId)
+                    const status = simStatuses[b.id]
+                    const isReady = status ? status.ready : true
+                    const note = status?.note || ''
+
+                    return (
+                      <div key={b.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="font-bold">{new Date(b.date).toLocaleDateString('th-TH')} • {TIME_SLOTS[b.slot]}</div>
+                            <div className="text-sm text-slate-500">นักเรียน: {b.name} | ผู้สอน: {instructor?.name || 'ไม่ระบุ'}</div>
+                          </div>
+                          <span className={['px-2 py-1 rounded-lg text-[10px] font-bold uppercase', isReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
+                            {isReady ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                await setSimulatorStatus(b.id, true, '')
+                                setTick(t => t+1)
+                              }}
+                              className={['btn py-1.5 text-xs flex-1', isReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                            >
+                              พร้อม
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const reason = prompt('ระบุเหตุผลที่ไม่พร้อม:')
+                                if (reason === null) return
+                                if (!reason.trim()) { alert('ต้องระบุเหตุผล'); return }
+                                await setSimulatorStatus(b.id, false, reason)
+                                setTick(t => t+1)
+                              }}
+                              className={['btn py-1.5 text-xs flex-1', !isReady ? 'btn-primary' : 'btn-outline'].join(' ')}
+                            >
+                              ไม่พร้อม
+                            </button>
+                          </div>
+                          {!isReady && note && (
+                            <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-1">
+                              เหตุผล: {note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {bookings.filter(b => b.instructorId && b.status === 'pending').length === 0 && (
+                    <div className="text-center py-8 text-slate-400">ยังไม่มีคิวที่นักบินรับงานสอน</div>
                   )}
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => setSimDraftReady(true)}
-                    className={['btn', simDraftReady ? 'btn-primary' : 'btn-outline'].join(' ')}
-                  >
-                    พร้อม
-                  </button>
-                  <button
-                    onClick={() => setSimDraftReady(false)}
-                    className={['btn', !simDraftReady ? 'btn-primary' : 'btn-outline'].join(' ')}
-                  >
-                    ไม่พร้อม
-                  </button>
-                </div>
-
-                <div className="mt-4 grid gap-2">
-                  <label className="text-sm font-semibold">หมายเหตุ / เหตุผล</label>
-                  <textarea
-                    value={simDraftNote}
-                    onChange={e => setSimDraftNote(e.target.value)}
-                    placeholder="เช่น เครื่องมีปัญหา, ระบบไม่พร้อม, ต้องการคนมาแทน ฯลฯ"
-                    className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 h-24 focus:ring-2 focus:ring-brand-500 transition-all outline-none"
-                  />
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <button
-                    disabled={simSaving}
-                    onClick={async () => {
-                      if (!simDraftReady && !simDraftNote.trim()) {
-                        alert('กรณีไม่พร้อม กรุณากรอกเหตุผลก่อนบันทึก')
-                        return
-                      }
-                      setSimSaving(true)
-                      const res = await setSimulatorStatus(simDraftReady, simDraftNote.trim() || undefined)
-                      setSimSaving(false)
-                      if (!res.ok) {
-                        alert(res.error)
-                        return
-                      }
-                      setTick(t => t + 1)
-                    }}
-                    className="btn btn-primary"
-                  >
-                    {simSaving ? 'กำลังบันทึก...' : 'บันทึกสถานะ'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSimDraftReady(simStatus?.ready ?? true)
-                      setSimDraftNote(simStatus?.note ? String(simStatus.note) : '')
-                    }}
-                    className="btn btn-outline"
-                  >
-                    ยกเลิกการแก้ไข
-                  </button>
                 </div>
               </div>
 

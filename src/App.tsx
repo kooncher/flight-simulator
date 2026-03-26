@@ -207,8 +207,9 @@ export default function App() {
       return
     }
     const res = await createBooking({
-      courseId: course.id,
-      date: selectedDate.toISOString().slice(0, 10),
+        courseId: course.id,
+        userId: user?.id || '',
+        date: selectedDate.toISOString().slice(0, 10),
       name: form.name,
       email: emailSan,
       phone: phoneDigits,
