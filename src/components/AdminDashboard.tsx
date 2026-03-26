@@ -217,12 +217,14 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           </button>
             </>
           )}
-          <button 
-            onClick={() => setTab('calendar')} 
-            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            ตารางบิน
-          </button>
+          {mode === 'admin' && (
+            <button 
+              onClick={() => setTab('calendar')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            >
+              ตารางบิน
+            </button>
+          )}
           {mode === 'admin' && (
             <>
           <button 
