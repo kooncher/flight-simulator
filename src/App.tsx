@@ -12,6 +12,7 @@ import { getBookings, getAnnouncements } from './store/booking'
 import Profile from './components/Profile'
 import Help from './components/Help'
 import AdminDashboard from './components/AdminDashboard'
+import Toast from './components/Toast'
 
 type Step = 'select' | 'calendar' | 'form' | 'done'
 
@@ -229,7 +230,6 @@ export default function App() {
     } else {
       const msg = 'error' in res ? res.error : 'ไม่สามารถจองได้'
       setMessage(msg)
-      alert(msg)
     }
   }
 
@@ -269,6 +269,7 @@ export default function App() {
       bookingsCount={myBookingsCount}
       userRole={user.role}
     >
+      <Toast message={message} onClose={() => setMessage(null)} variant="warning" />
       {!isStaff && (
         <section className="glass p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
