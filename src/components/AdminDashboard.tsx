@@ -177,86 +177,88 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   return (
     <div className="grid gap-6">
       <div className="grid gap-4">
-        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto whitespace-nowrap">
-          {mode === 'staff' && me?.role === 'Technician' && (
-            <button
-              onClick={() => setTab('ops')}
-              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto whitespace-nowrap scrollbar-hide w-full sm:w-auto">
+            {mode === 'staff' && me?.role === 'Technician' && (
+              <button
+                onClick={() => setTab('ops')}
+                className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'ops' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span>Flight Simulator</span>
+                </span>
+              </button>
+            )}
+            <button 
+              onClick={() => setTab('bookings')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            >
+              รายการจอง (ทั้งหมด)
+            </button>
+            {me?.role === 'Pilot' && (
+              <button 
+                onClick={() => setTab('my-tasks')} 
+                className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'my-tasks' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              >
+                งานสอนของฉัน
+              </button>
+            )}
+            {mode === 'admin' && (
+              <>
+            <button 
+              onClick={() => setTab('overview')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
             >
               <span className="inline-flex items-center gap-2">
-                <span>Flight Simulator</span>
+                <span>ภาพรวม</span>
+                {pendingCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-lg text-[10px] font-black bg-red-100 text-red-700">
+                    {pendingCount}
+                  </span>
+                )}
               </span>
             </button>
-          )}
-          <button 
-            onClick={() => setTab('bookings')} 
-            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'bookings' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            รายการจอง (ทั้งหมด)
-          </button>
-          {me?.role === 'Pilot' && (
             <button 
-              onClick={() => setTab('my-tasks')} 
-              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'my-tasks' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              onClick={() => setTab('users')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
             >
-              งานสอนของฉัน
+              นักเรียน
             </button>
-          )}
-          {mode === 'admin' && (
-            <>
-          <button 
-            onClick={() => setTab('overview')} 
-            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            <span className="inline-flex items-center gap-2">
-              <span>ภาพรวม</span>
-              {pendingCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-lg text-[10px] font-black bg-red-100 text-red-700">
-                  {pendingCount}
-                </span>
-              )}
-            </span>
-          </button>
-          <button 
-            onClick={() => setTab('users')} 
-            className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'users' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-          >
-            นักเรียน
-          </button>
-            </>
-          )}
-          {mode === 'admin' && (
+              </>
+            )}
+            {mode === 'admin' && (
+              <button 
+                onClick={() => setTab('calendar')} 
+                className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              >
+                ตารางบิน
+              </button>
+            )}
+            {mode === 'admin' && (
+              <>
             <button 
-              onClick={() => setTab('calendar')} 
-              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'calendar' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+               onClick={() => setTab('courses')} 
+               className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+             >
+               จัดการคอร์ส
+             </button>
+             <button 
+               onClick={() => setTab('announcements')} 
+               className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+             >
+               ประกาศ
+             </button>
+              </>
+            )}
+          </div>
+          <div className="flex items-center sm:justify-end">
+            <button 
+              onClick={() => setTick(t => t+1)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700"
             >
-              ตารางบิน
+              {loading ? '⏳ กำลังโหลด...' : '🔄 รีเฟรชข้อมูล'}
             </button>
-          )}
-          {mode === 'admin' && (
-            <>
-          <button 
-             onClick={() => setTab('courses')} 
-             className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-           >
-             จัดการคอร์ส
-           </button>
-           <button 
-             onClick={() => setTab('announcements')} 
-             className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-           >
-             ประกาศ
-           </button>
-            </>
-          )}
-        <div className="flex items-center justify-end">
-          <button 
-            onClick={() => setTick(t => t+1)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-brand-500 transition-colors bg-white dark:bg-slate-800 shadow-sm"
-          >
-            {loading ? '⏳ กำลังโหลด...' : '🔄 รีเฟรชข้อมูล'}
-          </button>
-        </div>
+          </div>
         </div>
       </div>
       {tab === 'ops' && (
