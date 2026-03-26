@@ -15,7 +15,7 @@ export type Course = {
 export type Booking = {
   id: string
   courseId: string
-  userId?: string
+  userId: string
   date: string
   name: string
   email: string
@@ -23,6 +23,7 @@ export type Booking = {
   slot: number
   status: 'pending' | 'completed' | 'cancelled'
   note?: string
+  instructorId?: string | null
 }
 
 export const DEFAULT_SLOTS = 5
@@ -107,13 +108,26 @@ export async function getBookings(): Promise<Booking[]> {
     phone: b.phone,
     slot: b.slot,
     status: b.status,
-    note: b.note
+    note: b.note,
+    instructorId: b.instructor_id
   })) as Booking[]
 }
 
 export async function updateBookingStatus(id: string, status: 'pending' | 'completed' | 'cancelled') {
   const { error } = await supabase.from('bookings').update({ status }).eq('id', id)
   if (error) console.error('Error updating booking status:', error)
+}
+
+export async function claimBooking(id: string, instructorId: string) {
+  const { error } = await supabase.from('bookings').update({ instructor_id: instructorId }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function unclaimBooking(id: string) {
+  const { error } = await supabase.from('bookings').update({ instructor_id: null }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 export async function getAvailability(): Promise<Record<string, number>> {

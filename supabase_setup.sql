@@ -14,7 +14,7 @@ CREATE TABLE courses (
 -- 2. Bookings Table
 CREATE TABLE bookings (
   id TEXT PRIMARY KEY,
-  course_id TEXT REFERENCES courses(id),
+  course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
   date DATE NOT NULL,
   slot INTEGER NOT NULL,
@@ -23,9 +23,12 @@ CREATE TABLE bookings (
   phone TEXT NOT NULL,
   status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'cancelled'
   note TEXT, -- สำหรับหมายเหตุการจองหรือเลื่อนวัน
+  instructor_id UUID REFERENCES auth.users(id), -- เก็บว่านักบินคนไหนเป็นคนรับสอน
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(date, slot) -- Prevent double booking
 );
+
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS instructor_id UUID REFERENCES auth.users(id);
 
 -- 3. Announcements Table
 CREATE TABLE announcements (

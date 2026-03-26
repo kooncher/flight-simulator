@@ -1,4 +1,4 @@
-import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, acknowledgeReplacementRequest, type SimulatorStatus, type ReplacementRequest } from '../store/booking'
+import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, acknowledgeReplacementRequest, type SimulatorStatus, type ReplacementRequest, claimBooking, unclaimBooking } from '../store/booking'
 import { getAllUsers, getUsersByRole, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
 import { useEffect, useMemo, useState, useRef } from 'react'
 
@@ -637,7 +637,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {bookings.map(b => (
+              {bookings.map(b => {
+                const isClaimedByMe = b.instructorId === me?.id
+                const isClaimed = !!b.instructorId
+                const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
+                
+                return (
                 <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                     <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
@@ -661,6 +666,40 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
                     {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
                     {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
+                    
+                    {b.status === 'pending' && (
+                      <div className="mt-2">
+                        {!isClaimed ? (
+                          <button 
+                            onClick={async () => {
+                              if (!me?.id) return
+                              const res = await claimBooking(b.id, me.id)
+                              if (res.ok) setTick(t => t+1)
+                            }}
+                            className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition"
+                          >
+                            รับงานสอนนี้
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
+                              ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
+                            </span>
+                            {(isClaimedByMe || isAdmin) && (
+                              <button 
+                                onClick={async () => {
+                                  const res = await unclaimBooking(b.id)
+                                  if (res.ok) setTick(t => t+1)
+                                }}
+                                className="text-[10px] text-red-500 hover:underline"
+                              >
+                                ยกเลิกรับงาน
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 sm:px-6 py-3 sm:py-4 text-slate-500 text-xs whitespace-nowrap">
                     {b.phone}
@@ -670,20 +709,24 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       {b.status === 'pending' && (
                         <>
                           <button 
+                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
-                            className="text-emerald-500 hover:text-emerald-600 text-xs font-bold text-left"
+                            className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-emerald-500 hover:text-emerald-600'].join(' ')}
+                            title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
                           >
                             Mark Completed
                           </button>
                           <button 
+                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
-                            className="text-red-500 hover:text-red-600 text-xs font-bold text-left"
+                            className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:text-red-600'].join(' ')}
+                            title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
                           >
                             Cancel
                           </button>
                         </>
                       )}
-                      {b.status !== 'pending' && (
+                      {b.status !== 'pending' && (isAdmin || isClaimedByMe) && (
                         <button 
                           onClick={async () => { await updateBookingStatus(b.id, 'pending'); setTick(t => t+1) }}
                           className="text-slate-400 hover:text-slate-600 text-xs font-medium text-left"
@@ -694,7 +737,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
               {bookings.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 sm:px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
