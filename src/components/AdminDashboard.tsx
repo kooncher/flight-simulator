@@ -518,23 +518,23 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       )}
 
       {tab === 'overview' && (
-        <div className="grid gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass p-4 sm:p-6 overflow-hidden">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">จองวันนี้ (Active)</div>
-              <div className="text-3xl font-bold text-brand-600">{stats.todayCount}</div>
+        <div className="grid gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div className="glass p-4 sm:p-6 overflow-hidden flex flex-col justify-between h-full">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 truncate">จองวันนี้ (Active)</div>
+              <div className="text-2xl sm:text-3xl font-bold text-brand-600">{stats.todayCount}</div>
             </div>
-            <div className="glass p-4 sm:p-6 overflow-hidden">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">จองสะสม (ไม่รวมยกเลิก)</div>
-              <div className="text-3xl font-bold">{stats.totalCount}</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden flex flex-col justify-between h-full">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 truncate">จองสะสม</div>
+              <div className="text-2xl sm:text-3xl font-bold">{stats.totalCount}</div>
             </div>
-            <div className="glass p-4 sm:p-6 overflow-hidden">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">นักเรียนทั้งหมด</div>
-              <div className="text-3xl font-bold">{stats.userCount}</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden flex flex-col justify-between h-full">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 truncate">นักเรียนทั้งหมด</div>
+              <div className="text-2xl sm:text-3xl font-bold">{stats.userCount}</div>
             </div>
-            <div className="glass p-4 sm:p-6 overflow-hidden">
-              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1 truncate">รายได้จริง (Completed)</div>
-              <div className="text-2xl sm:text-3xl font-bold text-emerald-600 truncate">฿{stats.estRevenue.toLocaleString()}</div>
+            <div className="glass p-4 sm:p-6 overflow-hidden flex flex-col justify-between h-full">
+              <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 truncate">รายได้จริง</div>
+              <div className="text-xl sm:text-3xl font-bold text-emerald-600 truncate">฿{stats.estRevenue.toLocaleString()}</div>
             </div>
           </div>
 
