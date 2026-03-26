@@ -633,139 +633,250 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
       )}
 
       {tab === 'bookings' && (
-        <div className="glass overflow-x-auto">
-          <table className="min-w-[920px] w-full text-left text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-              <tr>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">วันที่ / เวลา</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">นักเรียน</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4">คอร์ส / สถานะ</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">ติดต่อ</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {bookings.map(b => {
-                const isClaimedByMe = b.instructorId === me?.id
-                const isClaimed = !!b.instructorId
-                const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
-                
-                return (
-                <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                    <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                    <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
-                    <div className="font-medium">{b.name}</div>
-                    <div className="text-xs text-slate-400 truncate max-w-[320px]">{b.email}</div>
-                    {b.note && (
-                      <div className="mt-1 text-[10px] text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-1.5 py-0.5 rounded italic">
-                        Note: {b.note}
+        <div className="grid gap-4">
+          {/* Desktop View (Table) */}
+          <div className="hidden lg:block glass overflow-x-auto">
+            <table className="min-w-[920px] w-full text-left text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                <tr>
+                  <th className="px-6 py-4 whitespace-nowrap">วันที่ / เวลา</th>
+                  <th className="px-6 py-4">นักเรียน</th>
+                  <th className="px-6 py-4">คอร์ส / สถานะ</th>
+                  <th className="px-6 py-4 whitespace-nowrap">ติดต่อ</th>
+                  <th className="px-6 py-4 whitespace-nowrap">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {bookings.map(b => {
+                  const isClaimedByMe = b.instructorId === me?.id
+                  const isClaimed = !!b.instructorId
+                  const instructorUser = b.instructorId ? users.find(u => u.id === b.instructorId) : null
+                  
+                  return (
+                  <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                      <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium">{b.name}</div>
+                      <div className="text-xs text-slate-400 truncate max-w-[320px]">{b.email}</div>
+                      {b.note && (
+                        <div className="mt-1 text-[10px] text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-1.5 py-0.5 rounded italic">
+                          Note: {b.note}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="mb-2">
+                        <span className="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-xs font-medium">
+                          {courseMap[b.courseId] || b.courseId}
+                        </span>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
-                    <div className="mb-2">
-                      <span className="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-xs font-medium">
-                        {courseMap[b.courseId] || b.courseId}
-                      </span>
-                    </div>
-                    {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
-                    {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
-                    {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
-                    
-                    {b.status === 'pending' && (
-                      <div className="mt-2">
-                        {!isClaimed ? (
-                          me?.role === 'Technician' ? (
-                            <div className="text-[10px] text-amber-600 font-medium italic">รอนักบินรับงานสอน...</div>
+                      {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold">เรียนจบแล้ว</span>}
+                      {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">รอดำเนินการ</span>}
+                      {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-bold">ยกเลิกแล้ว</span>}
+                      
+                      {b.status === 'pending' && (
+                        <div className="mt-2">
+                          {!isClaimed ? (
+                            me?.role === 'Technician' ? (
+                              <div className="text-[10px] text-amber-600 font-medium italic">รอนักบินรับงานสอน...</div>
+                            ) : (
+                              <button 
+                                onClick={async () => {
+                                  if (!me?.id) return
+                                  const res = await claimBooking(b.id, me.id)
+                                  if (res.ok) setTick(t => t+1)
+                                }}
+                                className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition"
+                              >
+                                รับงานสอนนี้
+                              </button>
+                            )
                           ) : (
-                            <button 
-                              onClick={async () => {
-                                if (!me?.id) return
-                                const res = await claimBooking(b.id, me.id)
-                                if (res.ok) setTick(t => t+1)
-                              }}
-                              className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition"
-                            >
-                              รับงานสอนนี้
-                            </button>
-                          )
-                        ) : (
-                          <div className="grid gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
-                                ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
-                              </span>
-                              {(isClaimedByMe || isAdmin) && (
-                                <button 
-                                  onClick={async () => {
-                                    const res = await unclaimBooking(b.id)
-                                    if (res.ok) setTick(t => t+1)
-                                  }}
-                                  className="text-[10px] text-red-500 hover:underline"
-                                >
-                                  ยกเลิกรับงาน
-                                </button>
+                            <div className="grid gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={['px-2 py-1 rounded-lg text-[10px] font-bold', isClaimedByMe ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'].join(' ')}>
+                                  ผู้สอน: {instructorUser?.name || 'รับงานแล้ว'} {isClaimedByMe ? '(คุณ)' : ''}
+                                </span>
+                                {(isClaimedByMe || isAdmin) && (
+                                  <button 
+                                    onClick={async () => {
+                                      const res = await unclaimBooking(b.id)
+                                      if (res.ok) setTick(t => t+1)
+                                    }}
+                                    className="text-[10px] text-red-500 hover:underline"
+                                  >
+                                    ยกเลิกรับงาน
+                                  </button>
+                                )}
+                              </div>
+                              {/* แสดงสถานะเครื่องที่ช่างอัปเดตให้นักบินเห็น */}
+                              {simStatuses[b.id] && (
+                                <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex flex-wrap items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                                  <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
+                                  <span className="break-all">{simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}</span>
+                                </div>
                               )}
                             </div>
-                            {/* แสดงสถานะเครื่องที่ช่างอัปเดตให้นักบินเห็น */}
-                            {simStatuses[b.id] && (
-                              <div className={['px-2 py-1.5 rounded-lg text-[10px] border flex flex-wrap items-center gap-2', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
-                                <span className="font-bold whitespace-nowrap">สถานะอุปกรณ์:</span>
-                                <span className="break-all">{simStatuses[b.id].ready ? 'พร้อมใช้งาน' : `ไม่พร้อม (${simStatuses[b.id].note})`}</span>
-                              </div>
-                            )}
-                          </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 text-xs whitespace-nowrap">
+                      {b.phone}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        {b.status === 'pending' && (
+                          <>
+                            <button 
+                              disabled={!isClaimedByMe && !isAdmin}
+                              onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
+                              className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-emerald-500 hover:text-emerald-600'].join(' ')}
+                              title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
+                            >
+                              Mark Completed
+                            </button>
+                            <button 
+                              disabled={!isClaimedByMe && !isAdmin}
+                              onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
+                              className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:text-red-600'].join(' ')}
+                              title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                        {b.status !== 'pending' && (isAdmin || isClaimedByMe) && (
+                          <button 
+                            onClick={async () => { await updateBookingStatus(b.id, 'pending'); setTick(t => t+1) }}
+                            className="text-slate-400 hover:text-slate-600 text-xs font-medium text-left"
+                          >
+                            Revert to Pending
+                          </button>
                         )}
                       </div>
+                    </td>
+                  </tr>
+                )})}
+                {bookings.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View (Cards) */}
+          <div className="grid lg:hidden gap-4">
+            {bookings.filter(b => b.instructorId === me?.id).length === 0 ? (
+              <div className="glass p-8 text-center text-slate-400">คุณยังไม่ได้รับงานสอนใดๆ</div>
+            ) : (
+              bookings.filter(b => b.instructorId === me?.id).map(b => {
+                const instructorUser = users.find(u => u.id === b.instructorId)
+                
+                return (
+                  <div key={b.id} className={['glass p-4 sm:p-5 flex flex-col gap-4', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
+                    {/* Header: Date & Status */}
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-bold text-lg">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                        <div className="text-sm font-medium text-brand-500">{TIME_SLOTS[b.slot]}</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold">เรียนจบแล้ว</span>}
+                        {b.status === 'pending' && <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold">รอดำเนินการ</span>}
+                        {b.status === 'cancelled' && <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-bold">ยกเลิกแล้ว</span>}
+                        <span className="px-2 py-0.5 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 text-[10px] font-medium mt-1">
+                          {courseMap[b.courseId] || b.courseId}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Student Info */}
+                    <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <div className="font-semibold">{b.name}</div>
+                      <div className="text-xs text-slate-500 flex justify-between items-center mt-1">
+                        <span className="truncate">{b.email}</span>
+                        <a href={`tel:${b.phone}`} className="text-brand-500 font-medium ml-2 shrink-0">{b.phone}</a>
+                      </div>
+                      {b.note && (
+                        <div className="mt-2 text-xs text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-2 py-1 rounded italic">
+                          Note: {b.note}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Instructor & Sim Status (if pending) */}
+                    {b.status === 'pending' && (
+                      <div className="flex flex-col gap-2">
+                        <div className="grid gap-2">
+                          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span className="text-xs font-bold text-brand-600">
+                              ผู้สอน: {instructorUser?.name || 'คุณ'} (คุณ)
+                            </span>
+                            <button 
+                              onClick={async () => {
+                                const res = await unclaimBooking(b.id)
+                                if (res.ok) setTick(t => t+1)
+                              }}
+                              className="text-[10px] text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg"
+                            >
+                              ยกเลิกรับงาน
+                            </button>
+                          </div>
+                          
+                          {/* แสดงสถานะเครื่อง */}
+                          {simStatuses[b.id] && (
+                            <div className={['p-2.5 rounded-xl text-xs border flex flex-col gap-1', simStatuses[b.id].ready ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                              <div className="font-bold flex items-center gap-1">
+                                <span className="size-2 rounded-full bg-current"></span>
+                                สถานะอุปกรณ์: {simStatuses[b.id].ready ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
+                              </div>
+                              {!simStatuses[b.id].ready && simStatuses[b.id].note && (
+                                <div className="pl-3 opacity-80 break-all">{simStatuses[b.id].note}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-slate-500 text-xs whitespace-nowrap">
-                    {b.phone}
-                  </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4">
-                    <div className="flex flex-col gap-1">
+
+                    {/* Actions */}
+                    <div className="flex gap-2 mt-1 pt-4 border-t border-slate-100 dark:border-slate-800">
                       {b.status === 'pending' && (
                         <>
                           <button 
-                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันว่านักเรียนเรียนจบรอบนี้แล้ว?')) { await updateBookingStatus(b.id, 'completed'); setTick(t => t+1) } }}
-                            className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-emerald-500 hover:text-emerald-600'].join(' ')}
-                            title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
+                            className="flex-1 py-2 rounded-xl text-xs font-bold transition-colors bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                           >
                             Mark Completed
                           </button>
                           <button 
-                            disabled={!isClaimedByMe && !isAdmin}
                             onClick={async () => { if(confirm('ยืนยันการยกเลิกการจองนี้?')) { await updateBookingStatus(b.id, 'cancelled'); setTick(t => t+1) } }}
-                            className={['text-xs font-bold text-left', (!isClaimedByMe && !isAdmin) ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:text-red-600'].join(' ')}
-                            title={(!isClaimedByMe && !isAdmin) ? 'ต้องกดรับงานก่อนถึงจะอัปเดตสถานะได้' : ''}
+                            className="px-4 py-2 rounded-xl text-xs font-bold transition-colors bg-red-50 text-red-600 hover:bg-red-100"
                           >
                             Cancel
                           </button>
                         </>
                       )}
-                      {b.status !== 'pending' && (isAdmin || isClaimedByMe) && (
+                      {b.status !== 'pending' && (
                         <button 
                           onClick={async () => { await updateBookingStatus(b.id, 'pending'); setTick(t => t+1) }}
-                          className="text-slate-400 hover:text-slate-600 text-xs font-medium text-left"
+                          className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors"
                         >
                           Revert to Pending
                         </button>
                       )}
                     </div>
-                  </td>
-                </tr>
-              )})}
-              {bookings.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 sm:px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลการจอง</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                )
+              })
+            )}
+          </div>
         </div>
       )}
 
