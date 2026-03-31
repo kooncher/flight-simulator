@@ -1,4 +1,4 @@
-import { getBookings, getCourses, cancelBookingWithPolicy, rescheduleBooking, TIME_SLOTS, lessThan24h, type Booking, getTakenSlots } from '../store/booking'
+import { getBookings, getCourses, cancelBookingWithPolicy, rescheduleBooking, TIME_SLOTS, formatTimeRange, lessThan24h, type Booking, getTakenSlots } from '../store/booking'
 import { useEffect, useState } from 'react'
 
 type Props = {
@@ -76,7 +76,8 @@ export default function MyBookings({ userEmail }: Props) {
         <div key={b.id} className="glass p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex-1">
             <div className="font-semibold">{courses[b.courseId]?.name || b.courseId}</div>
-            <div className="text-slate-500 text-sm">วันที่: {new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} • เวลา: {TIME_SLOTS[b.slot] || ''}</div>
+            <div className="text-slate-500 text-sm">วันที่: {new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} • เวลา: {formatTimeRange(b.slot, b.durationHours)}</div>
+            <div className="text-slate-500 text-xs mt-1">เรียนกับ: {b.sessionKind === 'sim' ? `เครื่อง ${b.selectedSimId === 'sim2' ? 'SIM 2' : 'SIM 1'}` : 'นักบิน'}</div>
             {b.note && (
               <div className="mt-1 text-xs text-brand-600 bg-brand-50 dark:bg-brand-900/20 px-2 py-1 rounded-lg w-fit">
                 หมายเหตุ: {b.note}
@@ -108,8 +109,16 @@ export default function MyBookings({ userEmail }: Props) {
                     <div className="grid gap-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase">เลือกเวลาใหม่</label>
                       <div className="grid grid-cols-1 gap-1">
-                        {TIME_SLOTS.map((slot, idx) => {
-                          const isTaken = takenSlotsForNewDate.includes(idx) && (newDate !== b.date || idx !== b.slot)
+                        {TIME_SLOTS.map((_, idx) => {
+                          const dur = Math.max(1, Number(b.durationHours || 1))
+                          const exceeds = idx + dur > TIME_SLOTS.length
+                          const ownRange = new Set(Array.from({ length: dur }, (_, k) => b.slot + k))
+                          const rangeTaken = Array.from({ length: dur }, (_, k) => idx + k).some(s => {
+                            if (!takenSlotsForNewDate.includes(s)) return false
+                            if (newDate === b.date && ownRange.has(s)) return false
+                            return true
+                          })
+                          const isTaken = exceeds || rangeTaken
                           const isSelected = newSlot === idx
                           return (
                             <button
@@ -122,7 +131,7 @@ export default function MyBookings({ userEmail }: Props) {
                                 isTaken ? 'opacity-30 grayscale cursor-not-allowed' : 'hover:border-brand-300'
                               ].join(' ')}
                             >
-                              <span>{slot}</span>
+                              <span>{formatTimeRange(idx, dur)}</span>
                               {isTaken && <span className="text-[8px] opacity-60">ไม่ว่าง</span>}
                             </button>
                           )

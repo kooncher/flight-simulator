@@ -18,10 +18,14 @@ CREATE TABLE bookings (
   user_id UUID REFERENCES auth.users(id),
   date DATE NOT NULL,
   slot INTEGER NOT NULL,
+  duration_hours INTEGER DEFAULT 1,
+  session_kind TEXT DEFAULT 'pilot', -- 'pilot' | 'sim'
+  selected_pilot_id UUID REFERENCES auth.users(id),
+  selected_sim_id TEXT,
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'cancelled'
+  status TEXT DEFAULT 'pending', -- 'pending', 'paid', 'completed', 'cancelled'
   note TEXT, -- สำหรับหมายเหตุการจองหรือเลื่อนวัน
   instructor_id UUID REFERENCES auth.users(id), -- เก็บว่านักบินคนไหนเป็นคนรับสอน
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -29,6 +33,10 @@ CREATE TABLE bookings (
 );
 
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS instructor_id UUID REFERENCES auth.users(id);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS duration_hours INTEGER DEFAULT 1;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS session_kind TEXT DEFAULT 'pilot';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS selected_pilot_id UUID REFERENCES auth.users(id);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS selected_sim_id TEXT;
 
 -- 3. Announcements Table
 CREATE TABLE announcements (
@@ -94,12 +102,17 @@ CREATE TABLE profiles (
 );
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pilot_active BOOLEAN DEFAULT true;
 
 -- RLS for Profiles
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow users to read all profiles" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Allow users to update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Allow admin to update any profile" ON profiles FOR UPDATE USING (auth.jwt() ->> 'email' = 'admin@flight.com');
+CREATE POLICY "Allow admin role update any profile" ON profiles
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'));
 CREATE POLICY "Allow users insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Trigger to create profile on signup
@@ -128,6 +141,10 @@ INSERT INTO courses (id, name, description, hours, price, image, badge, tags) VA
 ('night', 'Night Rating Prep', 'เตรียมความพร้อมการบินกลางคืน ขั้นตอนและข้อควรระวัง', 7, 36000, 'https://images.unsplash.com/photo-1498861954500-5fca8909b4d9?auto=format&fit=crop&w=1200&q=60', NULL, '{Night, Procedures}'),
 ('ul', 'Ultralight Experience', 'สัมผัสการบินเครื่องบินเบา สนุกและปลอดภัย', 2, 6000, 'https://images.unsplash.com/photo-1547076529-95b43a6d1f50?auto=format&fit=crop&w=1200&q=60', NULL, '{Fun, Short}');
 
+INSERT INTO courses (id, name, description, hours, price, image, badge, tags)
+VALUES ('hourly', 'Hourly Lesson', 'จองเวลาเรียนแบบรายชั่วโมง (฿500/ชม.)', 1, 500, 'https://images.unsplash.com/photo-1529070538774-1843cb3265df?auto=format&fit=crop&w=1200&q=60', NULL, '{Hourly}')
+ON CONFLICT (id) DO NOTHING;
+
 -- 7. Flight Simulator Ops
 CREATE TABLE IF NOT EXISTS simulator_status (
   id TEXT PRIMARY KEY,
@@ -144,6 +161,16 @@ ALTER TABLE simulator_status ADD COLUMN IF NOT EXISTS booking_id TEXT REFERENCES
 INSERT INTO simulator_status (id, ready, note)
 VALUES ('main', true, NULL)
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO simulator_status (id, ready, note)
+VALUES ('sim1', true, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO simulator_status (id, ready, note)
+VALUES ('sim2', true, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE simulator_status SET ready = false WHERE id = 'sim2';
 
 CREATE TABLE IF NOT EXISTS replacement_requests (
   id TEXT PRIMARY KEY,
@@ -171,6 +198,10 @@ ALTER TABLE replacement_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow staff read simulator_status" ON simulator_status
   FOR SELECT
   USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role IN ('Admin', 'Technician', 'Pilot')));
+
+CREATE POLICY "Allow public read simulator_power" ON simulator_status
+  FOR SELECT
+  USING (id IN ('main', 'sim1', 'sim2'));
 
 CREATE POLICY "Allow staff update simulator_status" ON simulator_status
   FOR UPDATE

@@ -9,6 +9,7 @@ export type User = {
   phone?: string
   address?: string
   role?: UserRole
+  pilotActive?: boolean
 }
 
 const KEY = 'auth_user'
@@ -66,7 +67,8 @@ export async function getAllUsers(): Promise<User[]> {
     name: p.name as string | undefined,
     phone: p.phone as string | undefined,
     address: p.address as string | undefined,
-    role: p.role as UserRole
+    role: p.role as UserRole,
+    pilotActive: p.pilot_active === null || p.pilot_active === undefined ? true : Boolean(p.pilot_active)
   }))
 }
 
@@ -79,8 +81,15 @@ export async function getUsersByRole(role: UserRole): Promise<User[]> {
     name: p.name as string | undefined,
     phone: p.phone as string | undefined,
     address: p.address as string | undefined,
-    role: p.role as UserRole
+    role: p.role as UserRole,
+    pilotActive: p.pilot_active === null || p.pilot_active === undefined ? true : Boolean(p.pilot_active)
   }))
+}
+
+export async function updatePilotActive(userId: string, pilotActive: boolean) {
+  const { error } = await supabase.from('profiles').update({ pilot_active: pilotActive }).eq('id', userId)
+  if (error) return { ok: false as const, error: error.message }
+  return { ok: true as const }
 }
 
 export async function login(email: string, password: string): Promise<{ ok: true; user: User } | { ok: false; error: string }> {

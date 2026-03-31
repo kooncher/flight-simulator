@@ -1,5 +1,5 @@
-import { getBookings, getCourses, TIME_SLOTS, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, acknowledgeReplacementRequest, type SimulatorStatus, type ReplacementRequest, claimBooking, unclaimBooking } from '../store/booking'
-import { getAllUsers, getUsersByRole, getUser as getAuthUser, updateUserRole, type User, type UserRole } from '../store/auth'
+import { getBookings, getCourses, TIME_SLOTS, formatTimeRange, getFlightLog, getBlockedSlots, toggleBlockSlot, type Course, updateCourse, addCourse, deleteCourse, updateBookingStatus, getAnnouncements, addAnnouncement, deleteAnnouncement, type Announcement, type Booking, uploadCourseImage, getSimulatorStatus, setSimulatorStatus, getSimPowers, setSimPower, type SimUnitId, getReplacementRequests, createReplacementRequest, updateReplacementRequestStatus, acknowledgeReplacementRequest, type SimulatorStatus, type ReplacementRequest, claimBooking, unclaimBooking } from '../store/booking'
+import { getAllUsers, getUsersByRole, getUser as getAuthUser, updateUserRole, updatePilotActive, type User, type UserRole } from '../store/auth'
 import { useEffect, useMemo, useState, useRef } from 'react'
 
 type Props = {
@@ -11,7 +11,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   const isAdmin = me?.role === 'Admin'
   const isTechnician = me?.role === 'Technician'
 
-  const [tab, setTab] = useState<'ops' | 'overview' | 'bookings' | 'users' | 'calendar' | 'courses' | 'announcements' | 'my-tasks'>(() => {
+  const [tab, setTab] = useState<'ops' | 'overview' | 'bookings' | 'users' | 'pilots' | 'calendar' | 'courses' | 'announcements' | 'my-tasks'>(() => {
     if (mode === 'admin') return 'overview'
     if (isTechnician) return 'ops'
     return 'bookings'
@@ -24,8 +24,8 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [blockedMap, setBlockedMap] = useState<Record<string, number[]>>({})
   const [simStatuses, setSimStatuses] = useState<Record<string, SimulatorStatus>>({})
+  const [simPower, setSimPowerState] = useState<Record<SimUnitId, SimulatorStatus | null>>({ sim1: null, sim2: null })
   const [loading, setLoading] = useState(true)
-
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -72,6 +72,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
         if (s) statuses[cb.id] = s
       }
       setSimStatuses(statuses)
+      setSimPowerState(await getSimPowers())
 
       const me = getAuthUser()
       const roleForReplacement: UserRole | null = me?.role === 'Pilot' ? 'Pilot' : (me?.role === 'Technician' ? 'Technician' : null)
@@ -85,6 +86,10 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
     }
     loadData()
   }, [tick, mode])
+
+  useEffect(() => {
+    if (mode === 'admin' && tab === 'ops') setTab('overview')
+  }, [mode, tab])
 
   const courseMap = useMemo(() => courses.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {} as any), [courses])
   const userById = useMemo(() => users.reduce((acc, u) => {
@@ -122,7 +127,6 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
     }
   }
 
-  // Course management state
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
   const [isAddingCourse, setIsAddingCourse] = useState(false)
 
@@ -142,6 +146,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
     }
     setUploading(false)
   }
+
 
   // Overview Stats
   const stats = useMemo(() => {
@@ -224,6 +229,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
             >
               นักเรียน
             </button>
+            <button 
+              onClick={() => setTab('pilots')} 
+              className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'pilots' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+            >
+              นักบิน
+            </button>
               </>
             )}
             {mode === 'admin' && (
@@ -235,20 +246,12 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
               </button>
             )}
             {mode === 'admin' && (
-              <>
-            <button 
-               onClick={() => setTab('courses')} 
-               className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'courses' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-             >
-               จัดการคอร์ส
-             </button>
-             <button 
-               onClick={() => setTab('announcements')} 
-               className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
-             >
-               ประกาศ
-             </button>
-              </>
+              <button 
+                onClick={() => setTab('announcements')} 
+                className={['shrink-0 px-4 py-2 rounded-lg text-sm transition', tab === 'announcements' ? 'bg-white dark:bg-slate-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'].join(' ')}
+              >
+                ประกาศ
+              </button>
             )}
           </div>
           <div className="flex items-center sm:justify-end shrink-0">
@@ -280,7 +283,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       <div key={b.id} className={['p-3 sm:p-4 rounded-xl border transition-all', !isReady ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50'].join(' ')}>
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
                           <div className="min-w-0">
-                            <div className="font-bold text-sm sm:text-base">{new Date(b.date).toLocaleDateString('th-TH')} • {TIME_SLOTS[b.slot]}</div>
+                            <div className="font-bold text-sm sm:text-base">{new Date(b.date).toLocaleDateString('th-TH')} • {formatTimeRange(b.slot, b.durationHours)}</div>
                             <div className="text-xs sm:text-sm text-slate-500 truncate">นักเรียน: {b.name} | ผู้สอน: {instructor?.name || 'ไม่ระบุ'}</div>
                           </div>
                           <span className={['self-start px-2 py-1 rounded-lg text-[10px] font-bold uppercase shrink-0', isReady ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
@@ -439,7 +442,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                     <div>
                       <div className="font-semibold">
-                        {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {TIME_SLOTS[r.slot]}
+                        {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {formatTimeRange(r.slot, 1)}
                       </div>
                       <div className="text-sm text-slate-500 mt-1">{r.note}</div>
                       {(r.replacement_name || r.replacement_phone) && (
@@ -555,7 +558,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                           <div className="min-w-0">
                             <div className="font-semibold truncate">{whoLabel}</div>
                             <div className="text-xs text-slate-500 mt-0.5">
-                              {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {TIME_SLOTS[r.slot]}
+                              {new Date(r.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} • {formatTimeRange(r.slot, 1)}
                             </div>
                             <div className="text-sm text-slate-600 dark:text-slate-300 mt-2 line-clamp-2">{r.note}</div>
                           </div>
@@ -596,7 +599,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       return (
                         <div key={r.id} className="flex items-center justify-between gap-3 text-xs text-slate-500">
                           <div className="min-w-0 truncate">
-                            {whoLabel} • {TIME_SLOTS[r.slot]} • {new Date(r.date).toLocaleDateString('th-TH')}
+                            {whoLabel} • {formatTimeRange(r.slot, 1)} • {new Date(r.date).toLocaleDateString('th-TH')}
                           </div>
                           <div className="shrink-0 text-[10px] text-slate-400">
                             {ackLabel}{when ? ` • ${new Date(when).toLocaleString('th-TH')}` : ''}
@@ -656,7 +659,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                   <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                      <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
+                      <div className="text-xs text-slate-500">{formatTimeRange(b.slot, b.durationHours)}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium">{b.name}</div>
@@ -797,7 +800,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-bold text-lg">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                        <div className="text-sm font-medium text-brand-500">{TIME_SLOTS[b.slot]}</div>
+                        <div className="text-sm font-medium text-brand-500">{formatTimeRange(b.slot, b.durationHours)}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold inline-flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg> เรียนจบแล้ว</span>}
@@ -949,7 +952,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                   <tr key={b.id} className={['hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors', b.status === 'cancelled' ? 'opacity-50 grayscale' : ''].join(' ')}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-semibold">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                      <div className="text-xs text-slate-500">{TIME_SLOTS[b.slot]}</div>
+                      <div className="text-xs text-slate-500">{formatTimeRange(b.slot, b.durationHours)}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium">{b.name}</div>
@@ -1053,7 +1056,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-bold text-lg">{new Date(b.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                        <div className="text-sm font-medium text-brand-500">{TIME_SLOTS[b.slot]}</div>
+                        <div className="text-sm font-medium text-brand-500">{formatTimeRange(b.slot, b.durationHours)}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         {b.status === 'completed' && <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold inline-flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg> เรียนจบแล้ว</span>}
@@ -1156,6 +1159,112 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                 )
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'pilots' && (
+        <div className="grid gap-6">
+          <div className="glass p-4 sm:p-6 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-bold">สถานะเครื่อง Simulator</div>
+                <div className="text-sm text-slate-500 truncate">แสดงให้ลูกค้าเห็นว่าเครื่องพร้อมใช้งานหรือไม่</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {(['sim1', 'sim2'] as const).map(id => {
+                  const ready = simPower[id]?.ready ?? true
+                  const label = id === 'sim1' ? 'SIM 1' : 'SIM 2'
+                  return (
+                    <div key={id} className="flex items-center gap-2">
+                      <span className={['px-2 py-1 rounded-lg text-xs font-bold', ready ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'].join(' ')}>
+                        {label} {ready ? 'ON' : 'OFF'}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          const next = !ready
+                          const res = await setSimPower(id, next)
+                          if (res.ok) {
+                            setSimPowerState(await getSimPowers())
+                            setTick(t => t + 1)
+                          }
+                        }}
+                        className={['px-3 py-2 rounded-xl text-xs font-bold transition-colors', ready ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'].join(' ')}
+                      >
+                        {label} {ready ? 'OFF' : 'ON'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="glass p-4 sm:p-6 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="font-bold">นักบิน</h3>
+              <div className="text-xs font-bold text-slate-400">{users.filter(u => u.role === 'Pilot').length} คน</div>
+            </div>
+            <div className="grid gap-2">
+              {users.filter(u => u.role === 'Pilot').map(u => (
+                <div key={u.id || u.email} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{u.name || u.email}</div>
+                    <div className="text-xs text-slate-500 truncate">{u.email}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!isAdmin && (
+                      <span className={['px-2 py-1 rounded-lg text-[10px] font-black uppercase', (u.pilotActive ?? true) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'].join(' ')}>
+                        {(u.pilotActive ?? true) ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    )}
+                    {isAdmin && u.id && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={(u.pilotActive ?? true) === true}
+                          onClick={async () => {
+                            const res = await updatePilotActive(u.id!, true)
+                            if (res.ok) {
+                              setUsers(prev => prev.map(x => x.id === u.id ? { ...x, pilotActive: true } : x))
+                            } else {
+                              window.dispatchEvent(new CustomEvent('app-toast', { detail: { message: res.error || 'อัปเดตสถานะนักบินไม่สำเร็จ' } }))
+                            }
+                          }}
+                          className={[
+                            'px-3 py-2 rounded-xl text-xs font-bold transition-colors',
+                            (u.pilotActive ?? true) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                            (u.pilotActive ?? true) ? 'cursor-not-allowed' : ''
+                          ].join(' ')}
+                        >
+                          ACTIVE
+                        </button>
+                        <button
+                          disabled={(u.pilotActive ?? true) === false}
+                          onClick={async () => {
+                            const res = await updatePilotActive(u.id!, false)
+                            if (res.ok) {
+                              setUsers(prev => prev.map(x => x.id === u.id ? { ...x, pilotActive: false } : x))
+                            } else {
+                              window.dispatchEvent(new CustomEvent('app-toast', { detail: { message: res.error || 'อัปเดตสถานะนักบินไม่สำเร็จ' } }))
+                            }
+                          }}
+                          className={[
+                            'px-3 py-2 rounded-xl text-xs font-bold transition-colors',
+                            !(u.pilotActive ?? true) ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                            !(u.pilotActive ?? true) ? 'cursor-not-allowed' : ''
+                          ].join(' ')}
+                        >
+                          INACTIVE
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {users.filter(u => u.role === 'Pilot').length === 0 && (
+                <div className="text-center py-10 text-slate-400">ยังไม่มีบัญชีนักบิน</div>
+              )}
+            </div>
           </div>
         </div>
       )}

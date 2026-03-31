@@ -21,14 +21,55 @@ export type Booking = {
   email: string
   phone: string
   slot: number
+  durationHours: number
+  sessionKind: 'sim' | 'pilot'
+  selectedPilotId?: string | null
+  selectedSimId?: 'sim1' | 'sim2' | null
   status: 'pending' | 'completed' | 'cancelled' | 'paid'
   note?: string
   instructorId?: string | null
 }
 
-export const DEFAULT_SLOTS = 5
-export const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '13:00–15:00', '15:00–17:00', '17:00–19:00']
-export const SLOT_START_HOURS = [8, 10, 13, 15, 17]
+function pad2(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+function fmtHourDot(h: number) {
+  return `${pad2(h)}.00`
+}
+
+function mapDbError(error: any) {
+  const code = error?.code
+  const message = String(error?.message || '')
+  if (code === '23505' || message.includes('duplicate key value violates unique constraint')) {
+    return 'ช่วงเวลานี้มีคนจองแล้ว กรุณาเลือกเวลาอื่น'
+  }
+  if (code === '23503' || message.includes('violates foreign key constraint')) {
+    return 'ข้อมูลอ้างอิงไม่ถูกต้อง (กรุณารีเฟรชแล้วลองใหม่)'
+  }
+  return message || 'เกิดข้อผิดพลาด'
+}
+
+export const PRICE_PER_HOUR = 500
+export const BUSINESS_START_HOUR = 8
+export const BUSINESS_END_HOUR = 19
+export const SLOT_HOURS = 1
+
+export const SLOT_START_HOURS = Array.from(
+  { length: Math.max(0, BUSINESS_END_HOUR - BUSINESS_START_HOUR) },
+  (_, i) => BUSINESS_START_HOUR + i * SLOT_HOURS
+)
+
+export const TIME_SLOTS = SLOT_START_HOURS.map(h => `${fmtHourDot(h)} - ${fmtHourDot(h + SLOT_HOURS)}`)
+export const DEFAULT_SLOTS = TIME_SLOTS.length
+
+export const DURATION_HOURS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+
+export function formatTimeRange(slot: number, durationHours: number) {
+  const startH = SLOT_START_HOURS[slot] ?? BUSINESS_START_HOUR
+  const endH = startH + Math.max(1, durationHours || 1)
+  return `${fmtHourDot(startH)} - ${fmtHourDot(endH)}`
+}
 
 export function slotStartDate(date: string, slot: number) {
   const [y, m, d] = date.split('-').map(Number)
@@ -107,6 +148,10 @@ export async function getBookings(): Promise<Booking[]> {
     email: b.email,
     phone: b.phone,
     slot: b.slot,
+    durationHours: Number(b.duration_hours ?? 2),
+    sessionKind: (b.session_kind === 'sim' ? 'sim' : 'pilot'),
+    selectedPilotId: b.selected_pilot_id ?? null,
+    selectedSimId: (b.selected_sim_id === 'sim1' || b.selected_sim_id === 'sim2') ? b.selected_sim_id : null,
     status: b.status,
     note: b.note,
     instructorId: b.instructor_id
@@ -147,25 +192,24 @@ export async function getAvailability(): Promise<Record<string, number>> {
   const bookings = await getBookings()
   const blocked = await getBlockedSlots()
   
-  const map: Record<string, number> = {}
-  
-  // Count taken slots (bookings + blocked)
+  const occupiedByDate: Record<string, Set<number>> = {}
+
   bookings.forEach(b => {
     if (b.status === 'cancelled') return
-    map[b.date] = (map[b.date] || 0) + 1
-  })
-  
-  Object.entries(blocked).forEach(([date, slots]) => {
-    // Only count slots that aren't already counted by a booking
-    const dayBookings = bookings.filter(b => b.date === date && b.status !== 'cancelled').map(b => b.slot)
-    const uniqueBlocked = slots.filter(s => !dayBookings.includes(s))
-    map[date] = (map[date] || 0) + uniqueBlocked.length
+    const dur = Math.max(1, Number(b.durationHours || 1))
+    if (!occupiedByDate[b.date]) occupiedByDate[b.date] = new Set()
+    for (let i = 0; i < dur; i++) occupiedByDate[b.date].add(b.slot + i)
   })
 
-  // Convert to available count
+  Object.entries(blocked).forEach(([date, slots]) => {
+    if (!occupiedByDate[date]) occupiedByDate[date] = new Set()
+    slots.forEach(s => occupiedByDate[date].add(s))
+  })
+
   const result: Record<string, number> = {}
-  Object.entries(map).forEach(([date, taken]) => {
-    result[date] = Math.max(0, DEFAULT_SLOTS - taken)
+  Object.entries(occupiedByDate).forEach(([date, set]) => {
+    const taken = Array.from(set).filter(s => s >= 0 && s < TIME_SLOTS.length).length
+    result[date] = Math.max(0, TIME_SLOTS.length - taken)
   })
   
   return result
@@ -204,7 +248,7 @@ export async function getFlightLog(email: string) {
   
   all.forEach(b => {
     if (b.status === 'cancelled') return
-    const hours = 2 
+    const hours = Math.max(1, Number(b.durationHours || 1))
     if (!courseMap[b.courseId]) {
       courseMap[b.courseId] = { learned: 0, upcoming: 0 }
     }
@@ -225,10 +269,47 @@ export async function createBooking(b: Omit<Booking, 'id' | 'status'>): Promise<
   const user = getAuthUser()
   if (!user?.id) return { ok: false, error: 'กรุณาเข้าสู่ระบบก่อนจอง' }
 
-  const availability = await getAvailability()
-  const slots = availability[b.date] ?? DEFAULT_SLOTS
-  if (slots <= 0) {
-    return { ok: false, error: 'วันที่นี้เต็มแล้ว' }
+  let courseId = b.courseId
+  {
+    const { data: course, error: courseErr } = await supabase.from('courses').select('id').eq('id', courseId).maybeSingle()
+    if (courseErr || !course) {
+      const { data: first } = await supabase.from('courses').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+      if (first?.id) courseId = first.id as string
+    }
+  }
+
+  const sessionKind = b.sessionKind === 'sim' ? 'sim' : 'pilot'
+  const durationHours = Math.max(1, Math.floor(Number(b.durationHours || 1)))
+  if (durationHours > 8) return { ok: false, error: 'จำกัดความยาวคาบเรียนไม่เกิน 8 ชั่วโมง' }
+  if (b.slot < 0 || b.slot >= TIME_SLOTS.length) return { ok: false, error: 'ช่วงเวลาไม่ถูกต้อง' }
+  if (b.slot + durationHours > TIME_SLOTS.length) return { ok: false, error: 'ช่วงเวลานี้เกินเวลาทำการ' }
+
+  let selectedPilotId: string | null = b.selectedPilotId ?? null
+  let selectedSimId: 'sim1' | 'sim2' | null = b.selectedSimId ?? null
+
+  if (sessionKind === 'sim') {
+    const simPowers = await getSimPowers()
+    const sim1On = simPowers.sim1?.ready ?? true
+    const sim2On = simPowers.sim2?.ready ?? true
+    if (!sim1On && !sim2On) return { ok: false, error: 'ขณะนี้เครื่อง Simulator ปิดให้บริการ' }
+    const available: ('sim1' | 'sim2')[] = []
+    if (sim1On) available.push('sim1')
+    if (sim2On) available.push('sim2')
+    if (selectedSimId && !available.includes(selectedSimId)) return { ok: false, error: 'เครื่อง Simulator ที่เลือกปิดให้บริการ' }
+    if (!selectedSimId) selectedSimId = available[0] ?? null
+  }
+  if (sessionKind === 'pilot') {
+    const { data: activePilots, error: pilotErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'Pilot')
+      .eq('pilot_active', true)
+    if (!pilotErr && (!activePilots || activePilots.length === 0)) {
+      return { ok: false, error: 'ขณะนี้ยังไม่มีนักบินว่าง' }
+    }
+    const activeIds = (activePilots || []).map((p: any) => p.id as string)
+    if (selectedPilotId && !activeIds.includes(selectedPilotId)) return { ok: false, error: 'นักบินที่เลือกไม่ว่าง' }
+    if (!selectedPilotId) selectedPilotId = activeIds[0] ?? null
   }
 
   const allBookings = await getBookings()
@@ -237,13 +318,16 @@ export async function createBooking(b: Omit<Booking, 'id' | 'status'>): Promise<
     return { ok: false, error: 'จำกัดจอง 1 ครั้งต่อวัน' }
   }
 
-  const activeBookings = allBookings.filter(x => x.email === b.email && x.status === 'pending')
-  if (activeBookings.length * 2 + 2 > 8) {
-    return { ok: false, error: `คุณจองเวลาเรียนรวมกันเกิน 8 ชม. แล้ว (${activeBookings.length * 2 + 2} ชม.) กรุณาเรียนให้จบก่อนจองเพิ่ม` }
+  const activeHours = allBookings
+    .filter(x => x.email === b.email && (x.status === 'pending' || x.status === 'paid'))
+    .reduce((sum, x) => sum + Math.max(1, Number(x.durationHours || 1)), 0)
+  if (activeHours + durationHours > 8) {
+    return { ok: false, error: `คุณจองเวลาเรียนรวมกันเกิน 8 ชม. แล้ว (${activeHours + durationHours} ชม.) กรุณาเรียนให้จบก่อนจองเพิ่ม` }
   }
 
   const taken = new Set(await getTakenSlots(b.date))
-  if (taken.has(b.slot)) {
+  const rangeTaken = Array.from({ length: durationHours }, (_, i) => b.slot + i).some(s => taken.has(s))
+  if (rangeTaken) {
     return { ok: false, error: 'ช่วงเวลานี้ไม่ว่าง' }
   }
 
@@ -255,23 +339,27 @@ export async function createBooking(b: Omit<Booking, 'id' | 'status'>): Promise<
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekStart.getDate() + 6)
   
-  const countInWeek = allBookings.filter(x => {
+  const daysInWeek = new Set(allBookings.filter(x => {
     if (x.email !== b.email || x.status === 'cancelled') return false
     const d = new Date(x.date)
     return d >= weekStart && d <= weekEnd
-  }).length
+  }).map(x => x.date)).size
   
-  if (countInWeek >= 2) {
+  if (daysInWeek >= 2) {
     return { ok: false, error: 'จำกัดไม่เกิน 2 วันต่อสัปดาห์' }
   }
 
   const id = Math.random().toString(36).slice(2)
   const { data, error } = await supabase.from('bookings').insert({
     id,
-    course_id: b.courseId,
+    course_id: courseId,
     user_id: user.id,
     date: b.date,
     slot: b.slot,
+    duration_hours: durationHours,
+    session_kind: sessionKind,
+    selected_pilot_id: sessionKind === 'pilot' ? selectedPilotId : null,
+    selected_sim_id: sessionKind === 'sim' ? selectedSimId : null,
     name: b.name,
     email: b.email,
     phone: b.phone,
@@ -279,7 +367,7 @@ export async function createBooking(b: Omit<Booking, 'id' | 'status'>): Promise<
     note: b.note
   }).select().single()
 
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: mapDbError(error) }
   
   return { 
     ok: true, 
@@ -292,8 +380,13 @@ export async function createBooking(b: Omit<Booking, 'id' | 'status'>): Promise<
       email: data.email,
       phone: data.phone,
       slot: data.slot,
+      durationHours: Number(data.duration_hours ?? durationHours),
+      sessionKind: (data.session_kind === 'sim' ? 'sim' : sessionKind),
+      selectedPilotId: data.selected_pilot_id ?? selectedPilotId,
+      selectedSimId: data.selected_sim_id ?? selectedSimId,
       status: data.status,
-      note: data.note
+      note: data.note,
+      instructorId: data.instructor_id
     }
   }
 }
@@ -318,12 +411,15 @@ export async function rescheduleBooking(id: string, newDate: string, email: stri
   }
 
   // Check availability for the new date and slot
-  const taken = await getTakenSlots(newDate)
-  // If moving to a new slot on the SAME day, we can ignore the current booking's slot
-  const isSameDay = booking.date === newDate
-  const isSlotTaken = taken.includes(newSlot) && (!isSameDay || newSlot !== booking.slot)
+  if (newSlot < 0 || newSlot >= TIME_SLOTS.length) return { ok: false, error: 'ช่วงเวลาไม่ถูกต้อง' }
+  if (newSlot + booking.durationHours > TIME_SLOTS.length) return { ok: false, error: 'ช่วงเวลานี้เกินเวลาทำการ' }
 
-  if (isSlotTaken) {
+  const taken = new Set(await getTakenSlots(newDate))
+  if (booking.date === newDate) {
+    for (let i = 0; i < booking.durationHours; i++) taken.delete(booking.slot + i)
+  }
+  const rangeTaken = Array.from({ length: booking.durationHours }, (_, i) => newSlot + i).some(s => taken.has(s))
+  if (rangeTaken) {
     return { ok: false, error: 'ช่วงเวลานี้มีคนจองแล้ว กรุณาเลือกเวลาอื่น' }
   }
 
@@ -333,13 +429,15 @@ export async function rescheduleBooking(id: string, newDate: string, email: stri
     note: note || booking.note 
   }).eq('id', id)
   
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: mapDbError(error) }
   
   return { ok: true }
 }
 
 export async function getTakenSlots(date: string): Promise<number[]> {
-  const bookings = (await getBookings()).filter(b => b.date === date && b.status !== 'cancelled').map(b => b.slot)
+  const bookings = (await getBookings())
+    .filter(b => b.date === date && b.status !== 'cancelled')
+    .flatMap(b => Array.from({ length: Math.max(1, b.durationHours || 1) }, (_, i) => b.slot + i))
   const blockedMap = await getBlockedSlots()
   const blocked = blockedMap[date] || []
   return [...new Set([...bookings, ...blocked])]
@@ -448,6 +546,41 @@ export async function setSimulatorStatus(bookingId: string, ready: boolean, note
     .upsert({
       id: bookingId,
       booking_id: bookingId,
+      ready,
+      note: note ?? null,
+      updated_by: user.id,
+      updated_at: new Date().toISOString()
+    })
+  if (error) return { ok: false as const, error: error.message }
+  return { ok: true as const }
+}
+
+export const SIM_UNIT_IDS = ['sim1', 'sim2'] as const
+export type SimUnitId = (typeof SIM_UNIT_IDS)[number]
+
+export async function getSimPower(simId: SimUnitId): Promise<SimulatorStatus | null> {
+  const { data, error } = await supabase.from('simulator_status').select('*').eq('id', simId).maybeSingle()
+  if (!error && data) return data as SimulatorStatus
+  if (simId === 'sim1') {
+    const { data: legacy } = await supabase.from('simulator_status').select('*').eq('id', 'main').maybeSingle()
+    if (legacy) return legacy as SimulatorStatus
+  }
+  return null
+}
+
+export async function getSimPowers(): Promise<Record<SimUnitId, SimulatorStatus | null>> {
+  const [sim1, sim2] = await Promise.all([getSimPower('sim1'), getSimPower('sim2')])
+  return { sim1, sim2 }
+}
+
+export async function setSimPower(simId: SimUnitId, ready: boolean, note?: string) {
+  const user = getAuthUser()
+  if (!user?.id) return { ok: false as const, error: 'กรุณาเข้าสู่ระบบ' }
+  const { error } = await supabase
+    .from('simulator_status')
+    .upsert({
+      id: simId,
+      booking_id: null,
       ready,
       note: note ?? null,
       updated_by: user.id,

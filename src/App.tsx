@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Calendar from './components/Calendar'
 import { addDays } from './lib/date'
-import { getCourses, initAvailability, getAvailability, createBooking, ensureMonthAvailability, getTakenSlots, TIME_SLOTS, type Course, getSavedStudents, saveStudent, deleteSavedStudent } from './store/booking'
+import { initAvailability, getAvailability, createBooking, ensureMonthAvailability, getTakenSlots, TIME_SLOTS, PRICE_PER_HOUR, DURATION_HOURS_OPTIONS, formatTimeRange, BUSINESS_START_HOUR, BUSINESS_END_HOUR, type SimulatorStatus, getSimPowers, type SimUnitId, getSavedStudents, saveStudent, deleteSavedStudent } from './store/booking'
 import { buildICS } from './lib/ics'
 import Login from './components/Login'
-import { getUser, logout, checkSession } from './store/auth'
+import { getUser, logout, checkSession, getUsersByRole, type User } from './store/auth'
 import AppLayout from './layouts/AppLayout'
 import AuthLayout from './layouts/AuthLayout'
 import MyBookings from './components/MyBookings'
@@ -14,20 +14,26 @@ import Help from './components/Help'
 import AdminDashboard from './components/AdminDashboard'
 import Toast from './components/Toast'
 
-type Step = 'select' | 'calendar' | 'form' | 'done'
+type Step = 'calendar' | 'time' | 'form' | 'done'
 
 export default function App() {
+  function pad2(n: number) {
+    return String(n).padStart(2, '0')
+  }
+
   const [user, setUser] = useState(() => getUser())
-  const [step, setStep] = useState<Step>('select')
-  const [courses, setCourses] = useState<Course[]>([])
-  const [course, setCourse] = useState<Course | null>(null)
+  const [step, setStep] = useState<Step>('calendar')
   const [month, setMonth] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
+  const [durationHours, setDurationHours] = useState<number>(1)
+  const [sessionKind, setSessionKind] = useState<'pilot' | 'sim'>('pilot')
+  const [selectedPilotId, setSelectedPilotId] = useState<string | null>(null)
+  const [selectedSimId, setSelectedSimId] = useState<SimUnitId | null>(null)
   const [availability, setAvailability] = useState<Record<string, number>>({})
   const [form, setForm] = useState({ name: '', email: user?.email ?? '', phone: '' })
   const [message, setMessage] = useState<string | null>(null)
-  const [lastBooked, setLastBooked] = useState<{ courseName: string; date: string; slot: number } | null>(null)
+  const [lastBooked, setLastBooked] = useState<{ date: string; slot: number; durationHours: number; sessionKind: 'pilot' | 'sim'; selectedPilotId?: string | null; selectedSimId?: SimUnitId | null } | null>(null)
   const [q, setQ] = useState('')
   const [view, setView] = useState<'browse' | 'my' | 'profile' | 'help' | 'admin' | 'staff' | 'payment'>(() => {
     const u = getUser()
@@ -35,18 +41,14 @@ export default function App() {
     if (u?.role === 'Technician' || u?.role === 'Pilot') return 'staff'
     return 'browse'
   })
-  const [calExpanded, setCalExpanded] = useState(false)
   const [announcements, setAnnouncements] = useState<any[]>([])
+  const [pilots, setPilots] = useState<User[]>([])
+  const [simPower, setSimPower] = useState<Record<SimUnitId, SimulatorStatus | null>>({ sim1: null, sim2: null })
   
   const [tick, setTick] = useState(0)
   const [saveThisStudent, setSaveThisStudent] = useState(false)
   const [savedStudents, setSavedStudents] = useState<any[]>([])
   const [takenSlotsForDate, setTakenSlotsForDate] = useState<number[]>([])
-
-  const filteredCourses = useMemo(
-    () => courses.filter(c => (c.name + ' ' + c.description).toLowerCase().includes(q.toLowerCase())),
-    [courses, q]
-  )
   const [myBookingsCount, setMyBookingsCount] = useState(0)
 
   const [loading, setLoading] = useState(true)
@@ -77,15 +79,30 @@ export default function App() {
 
   useEffect(() => {
     async function loadBrowseData() {
-      const [annData, coursesData] = await Promise.all([
+      const [annData, pilotData, sim] = await Promise.all([
         getAnnouncements(),
-        getCourses()
+        getUsersByRole('Pilot'),
+        getSimPowers()
       ])
       setAnnouncements(annData)
-      setCourses(coursesData)
+      setPilots(pilotData)
+      setSimPower(sim)
     }
     if (view === 'browse') loadBrowseData()
   }, [view, step, tick])
+
+  useEffect(() => {
+    if (step !== 'time') return
+    const active = pilots.filter(p => (p.pilotActive ?? true) && !!p.id)
+    const sims = (['sim1', 'sim2'] as const).filter(id => simPower[id]?.ready ?? true)
+    if (sessionKind === 'pilot') {
+      if (!selectedPilotId || !active.some(p => p.id === selectedPilotId)) setSelectedPilotId(active[0]?.id || null)
+      setSelectedSimId(null)
+    } else {
+      if (!selectedSimId || !sims.includes(selectedSimId)) setSelectedSimId(sims[0] || null)
+      setSelectedPilotId(null)
+    }
+  }, [step, sessionKind, pilots, simPower, selectedPilotId, selectedSimId])
 
   useEffect(() => {
     async function loadSaved() {
@@ -126,6 +143,15 @@ export default function App() {
     return () => window.removeEventListener('user-updated', onUserUpdated as EventListener)
   }, [])
   useEffect(() => {
+    function onToast(e: Event) {
+      const ce = e as CustomEvent
+      const msg = (ce.detail as any)?.message
+      if (msg) setMessage(String(msg))
+    }
+    window.addEventListener('app-toast', onToast as EventListener)
+    return () => window.removeEventListener('app-toast', onToast as EventListener)
+  }, [])
+  useEffect(() => {
     async function load() {
       await ensureMonthAvailability(month)
       const data = await getAvailability()
@@ -159,34 +185,31 @@ export default function App() {
   }
 
   function resetFlow() {
-    setStep('select')
-    setCourse(null)
+    setStep('calendar')
     setSelectedDate(null)
     setSelectedSlot(null)
+    setDurationHours(1)
+    setSessionKind('pilot')
+    setSelectedPilotId(null)
+    setSelectedSimId(null)
     setForm({ name: '', email: '', phone: '' })
     setTick(t => t + 1)
   }
 
-  function handleSelectCourse(c: Course) {
-    setCourse(c)
-    setStep('calendar')
-  }
-
   async function handleSelectDate(d: Date) {
     setSelectedDate(d)
-    // pick first available time slot for that date by default
     const key = d.toISOString().slice(0, 10)
     const takenArr = await getTakenSlots(key)
     setTakenSlotsForDate(takenArr)
-    const taken = new Set(takenArr)
-    const first = Array.from({ length: TIME_SLOTS.length }, (_, i) => i).find(i => !taken.has(i)) ?? null
-    setSelectedSlot(first)
-    setStep('form')
+    setSelectedSlot(0)
+    setSelectedPilotId(null)
+    setSelectedSimId(null)
+    setStep('time')
   }
 
   async function submit() {
-    if (!course || !selectedDate || selectedSlot === null) {
-      setMessage('เลือกช่วงเวลาด้วย')
+    if (!selectedDate || selectedSlot === null) {
+      setMessage('เลือกวันและช่วงเวลาก่อน')
       return
     }
     // sanitize and validate
@@ -208,13 +231,17 @@ export default function App() {
       return
     }
     const res = await createBooking({
-        courseId: course.id,
+      courseId: 'hourly',
         userId: user?.id || '',
         date: selectedDate.toISOString().slice(0, 10),
       name: form.name,
       email: emailSan,
       phone: phoneDigits,
-      slot: selectedSlot
+      slot: selectedSlot,
+      durationHours,
+      sessionKind,
+      selectedPilotId: sessionKind === 'pilot' ? selectedPilotId : null,
+      selectedSimId: sessionKind === 'sim' ? selectedSimId : null
     })
     if ('ok' in res && res.ok) {
       if (saveThisStudent && user) {
@@ -225,7 +252,7 @@ export default function App() {
       setTick(t => t + 1)
       setStep('done')
       setView('payment') // เปลี่ยนจาก 'my' เป็น 'payment'
-      setLastBooked({ courseName: course.name, date: selectedDate.toISOString().slice(0, 10), slot: selectedSlot })
+      setLastBooked({ date: selectedDate.toISOString().slice(0, 10), slot: selectedSlot, durationHours, sessionKind, selectedPilotId, selectedSimId })
       setSaveThisStudent(false)
     } else {
       const msg = 'error' in res ? res.error : 'ไม่สามารถจองได้'
@@ -254,6 +281,18 @@ export default function App() {
   const isPilot = user.role === 'Pilot'
   const isStaff = isAdmin || isTechnician || isPilot
   const layoutView = view === 'payment' ? 'browse' : view
+  const activePilots = pilots.filter(p => (p.pilotActive ?? true) && !!p.id)
+  const availableSims = (['sim1', 'sim2'] as const).filter(id => simPower[id]?.ready ?? true)
+  const latestStartHour = Math.max(BUSINESS_START_HOUR, BUSINESS_END_HOUR - durationHours)
+  const hourOptions = Array.from({ length: Math.max(0, latestStartHour - BUSINESS_START_HOUR + 1) }, (_, i) => BUSINESS_START_HOUR + i)
+  const exceeds = selectedSlot === null ? true : (selectedSlot + durationHours > TIME_SLOTS.length)
+  const rangeTaken = selectedSlot === null
+    ? true
+    : Array.from({ length: durationHours }, (_, k) => selectedSlot + k).some(s => takenSlotsForDate.includes(s))
+  const chosenPilot = selectedPilotId ? activePilots.find(p => p.id === selectedPilotId) : null
+  const pilotOk = sessionKind === 'pilot' ? (!!chosenPilot) : true
+  const simOk = sessionKind === 'sim' ? (!!selectedSimId && availableSims.includes(selectedSimId)) : true
+  const canProceedTime = selectedSlot !== null && !exceeds && !rangeTaken && pilotOk && simOk
 
   return (
     <AppLayout
@@ -275,7 +314,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">จองวันเรียนคอร์สฝึกบิน</h1>
-              <p className="text-slate-500 mt-1">เลือกคอร์ส เลือกวัน แล้วยืนยันการจอง</p>
+              <p className="text-slate-500 mt-1">เลือกวันและช่วงเวลา แล้วกรอกข้อมูลเพื่อยืนยันการจอง</p>
             </div>
           </div>
         </section>
@@ -311,224 +350,330 @@ export default function App() {
 
       {view === 'browse' && !isStaff && (
         <div className="grid gap-6">
-            {step === 'select' && (
-              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-                {filteredCourses.map(c => (
-                  <div key={c.id} className="glass p-6 flex flex-col justify-between">
-                    <div>
-                      <div className="-mx-6 -mt-6 mb-5">
-                        <div className="relative overflow-hidden rounded-t-2xl aspect-[16/9] bg-slate-100 dark:bg-slate-800">
-                          <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
-                          {c.badge && (
-                            <span
-                              className={[
-                                'absolute top-3 left-3 px-2 py-1 rounded-lg text-xs font-medium text-white shadow-md',
-                                c.badge === 'NEW'
-                                  ? 'bg-emerald-500'
-                                  : c.badge === 'RECOMMENDED'
-                                  ? 'bg-brand-500'
-                                  : 'bg-fuchsia-500'
-                              ].join(' ')}
-                            >
-                              {c.badge}
-                            </span>
-                          )}
+          {step === 'calendar' && (
+            <section className="grid gap-6">
+              <div className="glass p-6 overflow-hidden">
+                <div className="flex items-center justify-between mb-4 gap-2">
+                  <div className="flex items-center gap-2">
+                    <button className="btn btn-outline" onClick={prevMonth}>ก่อนหน้า</button>
+                    <button className="btn btn-outline" onClick={nextMonth}>ถัดไป</button>
+                  </div>
+                  <div className="font-semibold">{month.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">สถานะ</span>
+                  <span className={['px-2 py-1 rounded-lg text-[10px] font-bold border', (simPower.sim1?.ready ?? true) ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                    SIM 1 {(simPower.sim1?.ready ?? true) ? 'ON' : 'OFF'}
+                  </span>
+                  <span className={['px-2 py-1 rounded-lg text-[10px] font-bold border', (simPower.sim2?.ready ?? true) ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-red-50 border-red-100 text-red-700'].join(' ')}>
+                    SIM 2 {(simPower.sim2?.ready ?? true) ? 'ON' : 'OFF'}
+                  </span>
+                  <span className={['px-2 py-1 rounded-lg text-[10px] font-bold border', pilots.some(p => p.pilotActive ?? true) ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500'].join(' ')}>
+                    PILOT {pilots.some(p => p.pilotActive ?? true) ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+
+                {((!(simPower.sim1?.ready ?? true) && !(simPower.sim2?.ready ?? true)) && pilots.filter(p => p.pilotActive ?? true).length === 0) && (
+                  <div className="p-4 rounded-2xl border mb-4 bg-red-50 border-red-100 text-red-700">
+                    <div className="font-bold">ไม่สามารถจองได้ชั่วคราว</div>
+                    <div className="text-sm mt-1">
+                      เครื่อง Simulator ปิดให้บริการ และไม่มีนักบินว่าง
+                    </div>
+                  </div>
+                )}
+
+                <Calendar
+                  month={month}
+                  selected={selectedDate ?? undefined}
+                  availability={availability}
+                  onSelect={async (d) => {
+                    if ((!(simPower.sim1?.ready ?? true) && !(simPower.sim2?.ready ?? true)) && pilots.filter(p => p.pilotActive ?? true).length === 0) {
+                      setMessage('ขณะนี้ไม่สามารถจองได้ (SIM OFF และนักบิน INACTIVE)')
+                      return
+                    }
+                    await handleSelectDate(d)
+                  }}
+                />
+
+                <div className="mt-4 text-sm text-slate-500">
+                  หมายเหตุ: จำกัดจองล่วงหน้ารวมไม่เกิน 8 ชั่วโมง และสูงสุด 2 วันต่อสัปดาห์ (จันทร์–อาทิตย์)
+                </div>
+
+              </div>
+            </section>
+          )}
+
+          {step === 'time' && selectedDate && (
+            <section className="grid gap-6">
+              <div className="glass p-6 overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="min-w-0">
+                    <div className="font-semibold">เลือกช่วงเวลา</div>
+                    <div className="text-sm text-slate-500 truncate">{selectedDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                  </div>
+                  <button className="btn btn-outline shrink-0" onClick={() => setStep('calendar')}>ย้อนกลับ</button>
+                </div>
+
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">เรียนกับ</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className={['px-4 py-2 rounded-xl text-xs font-bold border transition', sessionKind === 'pilot' ? 'bg-brand-500 text-white border-brand-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'].join(' ')}
+                        disabled={activePilots.length === 0}
+                        onClick={() => {
+                          setSessionKind('pilot')
+                          const first = activePilots[0]?.id || null
+                          if (!selectedPilotId || !activePilots.some(p => p.id === selectedPilotId)) setSelectedPilotId(first)
+                          setSelectedSimId(null)
+                        }}
+                      >
+                        นักบิน
+                      </button>
+                      <button
+                        className={['px-4 py-2 rounded-xl text-xs font-bold border transition', sessionKind === 'sim' ? 'bg-brand-500 text-white border-brand-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'].join(' ')}
+                        disabled={availableSims.length === 0}
+                        onClick={() => {
+                          setSessionKind('sim')
+                          const first = availableSims[0] || null
+                          if (!selectedSimId || !availableSims.includes(selectedSimId)) setSelectedSimId(first)
+                          setSelectedPilotId(null)
+                        }}
+                      >
+                        เครื่อง SIM
+                      </button>
+                    </div>
+                  </div>
+
+                  {sessionKind === 'pilot' && (
+                    <div className="grid gap-2">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">นักบิน</div>
+                      <select
+                        value={selectedPilotId ?? ''}
+                        disabled={activePilots.length === 0}
+                        onChange={e => setSelectedPilotId(e.target.value || null)}
+                        className="w-full sm:w-80 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm"
+                      >
+                        <option value="" disabled>{activePilots.length === 0 ? 'ไม่มีนักบิน ACTIVE' : 'เลือกนักบิน'}</option>
+                        {activePilots.map(p => (
+                          <option key={p.id} value={p.id!}>{p.name || p.email}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {sessionKind === 'sim' && (
+                    <div className="grid gap-2">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">เครื่อง SIM</div>
+                      <select
+                        value={selectedSimId ?? ''}
+                        disabled={availableSims.length === 0}
+                        onChange={e => setSelectedSimId((e.target.value as SimUnitId) || null)}
+                        className="w-full sm:w-56 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm"
+                      >
+                        <option value="" disabled>{availableSims.length === 0 ? 'SIM ปิดให้บริการ' : 'เลือกเครื่อง'}</option>
+                        {(['sim1', 'sim2'] as const).map(id => {
+                          const isOn = availableSims.includes(id)
+                          const label = id === 'sim1' ? 'SIM 1' : 'SIM 2'
+                          return (
+                            <option key={id} value={id} disabled={!isOn}>
+                              {label} {isOn ? 'ON' : 'OFF'}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="grid gap-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ระยะเวลา (ชั่วโมง)</div>
+                    <select
+                      value={durationHours}
+                      onChange={e => { setDurationHours(Number(e.target.value)); setSelectedSlot(0) }}
+                      className="w-full sm:w-48 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    >
+                      {DURATION_HOURS_OPTIONS.map(h => (
+                        <option key={h} value={h}>{h} ชม. (฿{(h * PRICE_PER_HOUR).toLocaleString()})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ช่วงเวลา</div>
+                    <div className="grid sm:grid-cols-[240px_1fr] gap-3 items-start">
+                      <div className="grid gap-2">
+                        <select
+                          value={selectedSlot ?? 0}
+                          onChange={e => setSelectedSlot(Number(e.target.value))}
+                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm"
+                        >
+                          {hourOptions.map(h => (
+                            <option key={h} value={h - BUSINESS_START_HOUR}>
+                              {pad2(h)}.00
+                            </option>
+                          ))}
+                        </select>
+                        <div className="text-xs text-slate-500">
+                          นาทีล็อคเป็น 00 • เวลาเปิด {pad2(BUSINESS_START_HOUR)}.00-{pad2(BUSINESS_END_HOUR)}.00
                         </div>
                       </div>
-                      <div className="text-lg font-semibold">{c.name}</div>
-                      <div className="text-slate-500 mt-1">{c.description}</div>
-                      {c.tags && c.tags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {c.tags.map(t => (
-                            <span key={t} className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                              {t}
-                            </span>
+                      <div className="grid gap-2">
+                        <div className="text-sm font-semibold">
+                          {selectedSlot === null ? 'กรุณาเลือกเวลาเริ่ม' : formatTimeRange(selectedSlot, durationHours)}
+                        </div>
+                        {selectedSlot !== null && exceeds && (
+                          <div className="text-sm text-red-600">ช่วงเวลานี้เกินเวลาทำการ</div>
+                        )}
+                        {selectedSlot !== null && !exceeds && rangeTaken && (
+                          <div className="text-sm text-red-600">ช่วงเวลานี้มีคนจองแล้ว</div>
+                        )}
+                        {sessionKind === 'pilot' && activePilots.length > 0 && !chosenPilot && (
+                          <div className="text-sm text-red-600">กรุณาเลือกนักบิน</div>
+                        )}
+                        {sessionKind === 'sim' && availableSims.length > 0 && !simOk && (
+                          <div className="text-sm text-red-600">กรุณาเลือกเครื่อง</div>
+                        )}
+                        <div className="flex gap-2">
+                          <button className="btn btn-outline" onClick={() => { setSelectedSlot(null) }}>ล้าง</button>
+                          <button className="btn btn-primary" disabled={!canProceedTime} onClick={() => setStep('form')}>ถัดไป</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {step === 'form' && selectedDate && selectedSlot !== null && (
+            <section className="grid md:grid-cols-2 gap-6">
+              <div className="glass p-6 overflow-hidden">
+                <div className="font-semibold mb-4">ข้อมูลผู้เรียน</div>
+
+                <div className="mb-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                  <div className="text-sm font-semibold">สรุปเวลาเรียน</div>
+                  <div className="mt-1 text-slate-600 dark:text-slate-300">
+                    {selectedDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} • {formatTimeRange(selectedSlot, durationHours)}
+                  </div>
+                  <div className="mt-1 text-slate-600 dark:text-slate-300">
+                    เรียนกับ: {sessionKind === 'sim' ? `เครื่อง ${selectedSimId === 'sim2' ? 'SIM 2' : 'SIM 1'}` : (chosenPilot?.name || chosenPilot?.email || 'นักบิน')} • {durationHours} ชม. • ฿{(durationHours * PRICE_PER_HOUR).toLocaleString()}
+                  </div>
+                  <div className="mt-3">
+                    <button className="btn btn-outline" onClick={() => setStep('time')}>เปลี่ยนช่วงเวลา</button>
+                  </div>
+                </div>
+
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      name: user?.name || '',
+                      email: (user?.email ? user.email.replace(/[\u0E00-\u0E7F]/g, '').replace(/\s+/g, '') : ''),
+                      phone: (user?.phone ? user.phone.replace(/\D/g, '').slice(0, 10) : '')
+                    }))}
+                  >
+                    ใช้จากโปรไฟล์
+                  </button>
+                  
+                  {savedStudents.length > 0 && (
+                    <div className="relative group">
+                      <button className="btn btn-outline">
+                        เลือกผู้เรียนที่บันทึกไว้ ({savedStudents.length})
+                      </button>
+                      <div className="absolute top-full left-0 z-50 hidden group-hover:block w-64 glass p-2 mt-1 shadow-xl">
+                        <div className="text-[10px] text-slate-400 mb-2 uppercase font-bold tracking-widest px-2">รายชื่อที่บันทึกไว้</div>
+                        <div className="max-h-48 overflow-auto grid gap-1">
+                          {savedStudents.map(s => (
+                            <div key={s.id} className="flex items-center gap-1 group/item">
+                              <button 
+                                className="flex-1 text-left px-2 py-1.5 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition"
+                                onClick={() => {
+                                  setForm({ name: s.name, email: s.email, phone: s.phone })
+                                  setSaveThisStudent(false)
+                                }}
+                              >
+                                <div className="text-sm font-semibold truncate">{s.name}</div>
+                                <div className="text-[10px] text-slate-500 truncate">{s.email}</div>
+                              </button>
+                              <button 
+                                className="p-1.5 hover:bg-red-50 text-red-400 opacity-0 group-hover/item:opacity-100 transition rounded-lg"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if(confirm('ยืนยันการลบรายชื่อนี้?')) {
+                                    deleteSavedStudent(user!.email, s.id); 
+                                    setTick(t => t+1);
+                                  }
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           ))}
                         </div>
-                      )}
-                      <div className="mt-4 flex items-center justify-between">
-                        <div className="text-2xl font-bold text-brand-600">฿{c.price.toLocaleString()}</div>
-                        <div className="text-sm text-slate-500">หลักสูตร {c.hours} ชม.</div>
                       </div>
                     </div>
-                    <button onClick={() => handleSelectCourse(c)} className="btn btn-primary mt-6">เลือกคอร์สนี้</button>
-                  </div>
-                ))}
-                {filteredCourses.length === 0 && (
-                  <div className="glass p-6">ไม่พบคอร์สที่ตรงกับคำค้น</div>
-                )}
-              </section>
-            )}
+                  )}
+                </div>
 
-            {step === 'calendar' && course && (
-              <section className={['grid gap-6', calExpanded ? 'md:grid-cols-1' : 'md:grid-cols-[1.5fr_1fr]'].join(' ')}>
-                <div className="glass p-6">
-                  <div className="flex items-center justify-between mb-4 gap-2">
-                    <div className="flex items-center gap-2">
-                      <button className="btn btn-outline" onClick={prevMonth}>ก่อนหน้า</button>
-                      <button className="btn btn-outline" onClick={nextMonth}>ถัดไป</button>
-                    </div>
-                    <div className="font-semibold">{month.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}</div>
-                    <button className="btn btn-outline" onClick={() => setCalExpanded(v => !v)}>{calExpanded ? 'ย่อปฏิทิน' : 'ขยายปฏิทิน'}</button>
+                <div className="grid gap-4">
+                  <div className="grid gap-1">
+                    <label className="text-sm text-slate-600 dark:text-slate-300">ชื่อ-นามสกุล</label>
+                    <input className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                   </div>
-                  <Calendar
-                    month={month}
-                    selected={selectedDate ?? undefined}
-                    availability={availability}
-                    onSelect={handleSelectDate}
-                  />
-                  <div className="mt-4 text-sm text-slate-500">
-                    หมายเหตุ: จำกัดจองล่วงหน้ารวมไม่เกิน 8 ชั่วโมง และสูงสุด 2 วันต่อสัปดาห์ (จันทร์–อาทิตย์)
+                  <div className="grid gap-1">
+                    <label className="text-sm text-slate-600 dark:text-slate-300">อีเมล</label>
+                    <input
+                      type="email"
+                      inputMode="email"
+                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                      value={form.email}
+                      onChange={e => {
+                        const raw = e.target.value
+                        const noThai = raw.replace(/[\u0E00-\u0E7F]/g, '').replace(/\s+/g, '')
+                        const safe = noThai.replace(/[^A-Za-z0-9.@_%+-]/g, '')
+                        setForm({ ...form, email: safe })
+                      }}
+                    />
                   </div>
-                </div>
-                <div className="glass p-6">
-                  <div className="font-semibold">คอร์สที่เลือก</div>
-                  <div className="mt-2 text-2xl">{course.name}</div>
-                  <div className="text-slate-500">{course.description}</div>
-                  <div className="mt-4 text-3xl font-bold text-brand-600">฿{course.price.toLocaleString()}</div>
-                  <button onClick={() => setStep('select')} className="btn btn-outline mt-6">เปลี่ยนคอร์ส</button>
-                </div>
-              </section>
-            )}
-
-            {step === 'form' && course && selectedDate && (
-              <section className="grid md:grid-cols-2 gap-6">
-                <div className="glass p-6">
-                  <div className="font-semibold mb-4">ข้อมูลผู้เรียน</div>
-                  <div className="mb-4">
-                    <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">
-                      ช่วงเวลา (รอบละ 2 ชั่วโมง)
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {TIME_SLOTS.map((t, i) => {
-                        const disabled = takenSlotsForDate.includes(i)
-                        const active = selectedSlot === i
-                        return (
-                          <button
-                            key={t}
-                            disabled={disabled}
-                            onClick={() => setSelectedSlot(i)}
-                            className={[
-                              'px-3 py-2 rounded-xl border transition',
-                              active ? 'bg-brand-500 text-white border-brand-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700',
-                              disabled ? 'opacity-40 cursor-not-allowed' : 'hover:shadow'
-                            ].join(' ')}
-                          >
-                            {t}
-                          </button>
-                        )
-                      })}
-                    </div>
+                  <div className="grid gap-1">
+                    <label className="text-sm text-slate-600 dark:text-slate-300">โทรศัพท์</label>
+                    <input
+                      inputMode="tel"
+                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                      value={form.phone}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[\u0E00-\u0E7F]/g, '').replace(/\D/g, '').slice(0, 10)
+                        setForm({ ...form, phone: v })
+                      }}
+                    />
                   </div>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => setForm(f => ({
-                        ...f,
-                        name: user?.name || '',
-                        email: (user?.email ? user.email.replace(/[\u0E00-\u0E7F]/g, '').replace(/\s+/g, '') : ''),
-                        phone: (user?.phone ? user.phone.replace(/\D/g, '').slice(0, 10) : '')
-                      }))}
-                    >
-                      ใช้จากโปรไฟล์
-                    </button>
-                    
-                    {savedStudents.length > 0 && (
-                      <div className="relative group">
-                        <button className="btn btn-outline">
-                          เลือกผู้เรียนที่บันทึกไว้ ({savedStudents.length})
-                        </button>
-                        <div className="absolute top-full left-0 z-50 hidden group-hover:block w-64 glass p-2 mt-1 shadow-xl">
-                          <div className="text-[10px] text-slate-400 mb-2 uppercase font-bold tracking-widest px-2">รายชื่อที่บันทึกไว้</div>
-                          <div className="max-h-48 overflow-auto grid gap-1">
-                            {savedStudents.map(s => (
-                              <div key={s.id} className="flex items-center gap-1 group/item">
-                                <button 
-                                  className="flex-1 text-left px-2 py-1.5 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition"
-                                  onClick={() => {
-                                    setForm({ name: s.name, email: s.email, phone: s.phone })
-                                    setSaveThisStudent(false) // already saved
-                                  }}
-                                >
-                                  <div className="text-sm font-semibold truncate">{s.name}</div>
-                                  <div className="text-[10px] text-slate-500 truncate">{s.email}</div>
-                                </button>
-                                <button 
-                                  className="p-1.5 hover:bg-red-50 text-red-400 opacity-0 group-hover/item:opacity-100 transition rounded-lg"
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    if(confirm('ยืนยันการลบรายชื่อนี้?')) {
-                                      deleteSavedStudent(user!.email, s.id); 
-                                      setTick(t => t+1);
-                                    }
-                                  }}
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid gap-4">
-                    <div className="grid gap-1">
-                      <label className="text-sm text-slate-600 dark:text-slate-300">ชื่อ-นามสกุล</label>
-                      <input className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm text-slate-600 dark:text-slate-300">อีเมล</label>
-                      <input
-                        type="email"
-                        inputMode="email"
-                        className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
-                        value={form.email}
-                        onChange={e => {
-                          const raw = e.target.value
-                          const noThai = raw.replace(/[\u0E00-\u0E7F]/g, '').replace(/\s+/g, '')
-                          const safe = noThai.replace(/[^A-Za-z0-9.@_%+-]/g, '')
-                          setForm({ ...form, email: safe })
-                        }}
-                      />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm text-slate-600 dark:text-slate-300">โทรศัพท์</label>
-                      <input
-                        inputMode="tel"
-                        className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
-                        value={form.phone}
-                        onChange={e => {
-                          const v = e.target.value.replace(/[\u0E00-\u0E7F]/g, '').replace(/\D/g, '').slice(0, 10)
-                          setForm({ ...form, phone: v })
-                        }}
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        checked={saveThisStudent} 
-                        onChange={e => setSaveThisStudent(e.target.checked)}
-                        className="size-4 rounded accent-brand-500"
-                      />
-                      <span className="text-sm text-slate-600 dark:text-slate-300">บันทึกข้อมูลผู้เรียนนี้เพื่อการจอนครั้งถัดไป</span>
-                    </label>
-                    {message && <div className="text-red-600 text-sm">{message}</div>}
-                    <div className="flex gap-2">
-                      <button onClick={() => setStep('calendar')} className="btn btn-outline">ย้อนกลับ</button>
-                      <button onClick={submit} className="btn btn-primary">ยืนยันการจอง</button>
-                    </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={saveThisStudent} 
+                      onChange={e => setSaveThisStudent(e.target.checked)}
+                      className="size-4 rounded accent-brand-500"
+                    />
+                    <span className="text-sm text-slate-600 dark:text-slate-300">บันทึกข้อมูลผู้เรียนนี้เพื่อการจอนครั้งถัดไป</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button onClick={() => setStep('time')} className="btn btn-outline">ย้อนกลับ</button>
+                    <button onClick={submit} className="btn btn-primary">ยืนยันการจอง</button>
                   </div>
                 </div>
-                <div className="glass p-6">
-                  <div className="font-semibold">สรุปรายการ</div>
-                  <div className="mt-2">{course.name}</div>
-                  <div className="text-slate-500">{course.description}</div>
-                  <div className="mt-4">วันที่เรียน: {selectedDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                  <div className="mt-4 text-3xl font-bold text-brand-600">฿{course.price.toLocaleString()}</div>
-                </div>
-              </section>
-            )}
+              </div>
+              <div className="glass p-6 overflow-hidden">
+                <div className="font-semibold">สรุปรายการ</div>
+                <div className="mt-2 text-slate-500">เรียนกับ: {sessionKind === 'sim' ? `เครื่อง ${selectedSimId === 'sim2' ? 'SIM 2' : 'SIM 1'}` : (chosenPilot?.name || chosenPilot?.email || 'นักบิน')}</div>
+                <div className="mt-2 text-slate-500">ระยะเวลา: {durationHours} ชม.</div>
+                <div className="mt-2 text-slate-500">วันที่เรียน: {selectedDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <div className="mt-1 text-slate-500">เวลา: {formatTimeRange(selectedSlot, durationHours)}</div>
+                <div className="mt-4 text-3xl font-bold text-brand-600">฿{(durationHours * PRICE_PER_HOUR).toLocaleString()}</div>
+              </div>
+            </section>
+          )}
         </div>
       )}
 
@@ -539,8 +684,8 @@ export default function App() {
           </div>
           <h2 className="text-2xl font-bold mb-2">จองสำเร็จแล้ว!</h2>
           <p className="text-slate-500 mb-8">
-            กรุณาชำระเงินเพื่อยืนยันสิทธิ์การเข้าเรียนในคอร์ส <strong>{lastBooked.courseName}</strong><br/>
-            วันที่ {new Date(lastBooked.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} รอบ {TIME_SLOTS[lastBooked.slot]}
+            กรุณาชำระเงิน <strong>฿{(lastBooked.durationHours * PRICE_PER_HOUR).toLocaleString()}</strong> เพื่อยืนยันสิทธิ์การเข้าเรียน<br/>
+            วันที่ {new Date(lastBooked.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} เวลา {formatTimeRange(lastBooked.slot, lastBooked.durationHours)} • {lastBooked.sessionKind === 'sim' ? `เครื่อง ${lastBooked.selectedSimId === 'sim2' ? 'SIM 2' : 'SIM 1'}` : (pilots.find(p => p.id === lastBooked.selectedPilotId)?.name || pilots.find(p => p.id === lastBooked.selectedPilotId)?.email || 'นักบิน')}
           </p>
 
           <div className="w-full grid gap-6 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800 mb-8">
@@ -594,7 +739,8 @@ export default function App() {
               <button
                 className="btn btn-outline"
                 onClick={() => {
-                  const blob = buildICS(lastBooked.courseName, lastBooked.date, lastBooked.slot)
+                  const summary = `Flight Reserve • ${lastBooked.sessionKind === 'sim' ? 'SIM' : 'Pilot'} • ${formatTimeRange(lastBooked.slot, lastBooked.durationHours)}`
+                  const blob = buildICS(summary, lastBooked.date, lastBooked.slot, lastBooked.durationHours)
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a')
                   a.href = url
