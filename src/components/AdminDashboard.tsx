@@ -168,7 +168,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
     return {
       todayCount: todayBookings.length,
       totalCount: bookings.filter(b => b.status !== 'cancelled').length,
-      userCount: users.length,
+      userCount: users.filter(u => u.role === 'User').length,
       estRevenue: totalRevenue,
       popularCourses: courseStats.slice(0, 3)
     }
@@ -1274,7 +1274,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
           <div className="glass overflow-hidden h-fit flex flex-col">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 font-semibold bg-slate-50/50 dark:bg-slate-900/50">นักเรียนทั้งหมด</div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[300px] lg:max-h-[600px] overflow-y-auto">
-              {users.map(u => (
+              {users.filter(u => u.role === 'User').map(u => (
                 <button 
                   key={u.email} 
                   onClick={() => setSelectedUser(u)}
@@ -1285,15 +1285,7 @@ export default function AdminDashboard({ mode = 'admin' }: Props) {
                       <div className="font-semibold truncate">{u.name || 'ไม่ระบุชื่อ'}</div>
                       <div className="text-xs text-slate-400 truncate">{u.email}</div>
                     </div>
-                    <span className={[
-                      'text-[8px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 mt-1',
-                      u.role === 'Admin' ? 'bg-purple-100 text-purple-700' :
-                      u.role === 'Technician' ? 'bg-blue-100 text-blue-700' :
-                      u.role === 'Pilot' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-slate-100 text-slate-600'
-                    ].join(' ')}>
-                      {u.role}
-                    </span>
+                    <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 mt-1 bg-slate-100 text-slate-600">USER</span>
                   </div>
                 </button>
               ))}
